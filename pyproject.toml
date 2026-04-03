@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cognos-measure"
+version = "0.1.0"
+description = "Measurement library for intelligence experiments — GI ratios, compression metrics, compositional coverage"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.11"
+authors = [
+    {name = "Dan Vanderboom", email = "dan@criticalinsight.io"},
+]
+keywords = ["intelligence", "measurement", "generation-integration", "cognitive-systems"]
+
+dependencies = [
+    "pyyaml>=6.0",
+    "numpy>=1.26",
+    "pandas>=2.1",
+    "scipy>=1.11",
+    "matplotlib>=3.8",
+    "gitpython>=3.1",
+    "pydantic>=2.5",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4",
+    "pytest-cov>=4.1",
+    "ruff>=0.1",
+]
+
+[tool.setuptools.packages.find]
+include = ["cognos_measure*", "experiments*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v --tb=short"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"

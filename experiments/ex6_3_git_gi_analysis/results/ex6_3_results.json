@@ -1,0 +1,25 @@
+{
+  "experiment": "EX-6.3",
+  "run": "20260403-220048",
+  "status": "completed",
+  "evidence_level": "observational",
+  "measurements": {
+    "total_commits": 2614,
+    "g_count": 455,
+    "i_count": 1242,
+    "a_count": 917,
+    "overall_gi_ratio": 0.366,
+    "overall_balance": -1.449,
+    "rhythm_score": 0.105,
+    "alternation_count": 39,
+    "dominant_phase": "integration",
+    "mean_daily_commits": 11.88,
+    "active_days_pct": 75.0
+  },
+  "interpretation": "Analyzed 2614 commits. Overall GI ratio: 0.37 (Strongly integration-heavy (risk: premature convergence)). Rhythm score: 0.10 (Weak oscillation (may indicate phase lock)). The flywheel exhibits potential phase lock.",
+  "caveats": [
+    "Layer 4 (keyword) classification is coarse; inter-rater agreement untested",
+    "Commits vary in size \u2014 a 1-file commit and a 50-file commit count equally",
+    "Ambiguous commits excluded from ratio; may hide important signals"
+  ]
+}
