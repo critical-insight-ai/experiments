@@ -1,0 +1,27 @@
+{
+  "experiment": "EX-6.7",
+  "run": "20260403-231105",
+  "status": "completed",
+  "evidence_level": "observational",
+  "measurements": {
+    "run_id": "run/workflow/acme/ex-6-7-cooperative-antagonism/1.0.0/20260403005924-f2bd0edd",
+    "duration": "4 min 30 sec (00:59:24 - 01:03:55 UTC)",
+    "total_tokens": 18494,
+    "tasks_completed": 7,
+    "tasks_total": 7,
+    "tasks_failed": 0,
+    "tool_calls": 0,
+    "quality_trajectory": "[6.7, 7.9, 8.2]",
+    "breadth_trajectory": "[63, 96, 126]",
+    "mode_collapse": 0.0,
+    "overall_score": 8.2,
+    "dimension_scores": "{\"accuracy\": 9, \"completeness\": 8, \"coherence\": 8, \"depth\": 7, \"falsifiability\": 8, \"source diversity\": 9}",
+    "round_details": "[{\"round\": 1, \"accuracy\": 7, \"completeness\": 7, \"coherence\": 6, \"depth\": 6, \"falsifiability\": 7, \"source_diversity\": 7, \"breadth\": 63}, {\"round\": 2, \"accuracy\": 8, \"completeness\": 8, \"coherence\": 8, \"depth\": 7, \"falsifiability\": 8, \"source_diversity\": 8, \"breadth\": 96}, {\"round\": 3, \"accuracy\": 9, \"completeness\": 8, \"coherence\": 8, \"depth\": 7, \"falsifiability\": 8, \"source_diversity\": 9, \"breadth\": 126}]"
+  },
+  "interpretation": "Quality: 6.7 -> 7.9 -> 8.2. Tool calls: 0. Mode collapse: no. vs Run 1 baseline: quality delta +0.0, tool delta +0.",
+  "caveats": [
+    "Single run \u2014 no statistical power for cross-run comparison",
+    "Different model versions across runs may confound",
+    "Quality scores are model-self-assessed (judge agent), not ground truth"
+  ]
+}

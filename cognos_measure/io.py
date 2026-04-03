@@ -96,10 +96,21 @@ def read_git_log(log_path: Path | str) -> list[dict[str, str]]:
     return commits
 
 
-def iter_git_log(repo_path: Path | str, since: str = "", until: str = "") -> Iterator[dict[str, str]]:
+def iter_git_log(
+    repo_path: Path | str,
+    since: str = "",
+    until: str = "",
+    include_stats: bool = False,
+) -> Iterator[dict[str, Any]]:
     """Iterate over git log entries from a live repo using gitpython.
 
     Yields dicts with: hash, date (ISO), author, message.
+    When *include_stats* is True, each dict also contains:
+        files_added, files_modified, files_deleted, files_renamed (int counts),
+        total_insertions, total_deletions (int line counts),
+        file_paths (list[str] of changed file paths).
+    Note: include_stats=True is significantly slower (~30-60s for 2600 commits)
+    because it triggers a git diff per commit.
     """
     from git import Repo
 
@@ -111,9 +122,52 @@ def iter_git_log(repo_path: Path | str, since: str = "", until: str = "") -> Ite
         kwargs["until"] = until
 
     for commit in repo.iter_commits("HEAD", **kwargs):
-        yield {
+        entry: dict[str, Any] = {
             "hash": commit.hexsha[:12],
             "date": commit.committed_datetime.isoformat(),
             "author": str(commit.author),
             "message": commit.message.strip().split("\n")[0],
         }
+
+        if include_stats:
+            try:
+                stats = commit.stats
+                files_info = stats.files  # {path: {insertions, deletions, lines}}
+                # Determine change_type per file by comparing against parents
+                added = 0
+                modified = 0
+                deleted = 0
+                renamed = 0
+                if commit.parents:
+                    parent = commit.parents[0]
+                    for diff in parent.diff(commit):
+                        if diff.new_file:
+                            added += 1
+                        elif diff.deleted_file:
+                            deleted += 1
+                        elif diff.renamed_file:
+                            renamed += 1
+                        else:
+                            modified += 1
+                else:
+                    # Root commit: all files are additions
+                    added = len(files_info)
+
+                entry["files_added"] = added
+                entry["files_modified"] = modified
+                entry["files_deleted"] = deleted
+                entry["files_renamed"] = renamed
+                entry["total_insertions"] = stats.total.get("insertions", 0)
+                entry["total_deletions"] = stats.total.get("deletions", 0)
+                entry["file_paths"] = list(files_info.keys())
+            except Exception:
+                # Fallback: stats unavailable (e.g. shallow clone)
+                entry["files_added"] = 0
+                entry["files_modified"] = 0
+                entry["files_deleted"] = 0
+                entry["files_renamed"] = 0
+                entry["total_insertions"] = 0
+                entry["total_deletions"] = 0
+                entry["file_paths"] = []
+
+        yield entry

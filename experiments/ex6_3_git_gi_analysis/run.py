@@ -15,6 +15,7 @@ from pathlib import Path
 
 from cognos_measure.gi import (
     classify_commit_message,
+    classify_commit_layer3,
     gi_ratio,
     gi_rhythm_score,
     windowed_gi,
@@ -47,8 +48,8 @@ def run(repo_path: Path, since: str = "", until: str = "") -> ExperimentResult:
     print("=" * 50)
 
     # --- Step 1: Load commits ---
-    print(f"\n1. Loading Git history from {repo_path}...")
-    commits = list(iter_git_log(repo_path, since=since, until=until))
+    print(f"\n1. Loading Git history from {repo_path} (with diff stats)...")
+    commits = list(iter_git_log(repo_path, since=since, until=until, include_stats=True))
     commits.reverse()  # chronological order (oldest first)
     print(f"   Loaded {len(commits)} commits")
 
@@ -57,12 +58,23 @@ def run(repo_path: Path, since: str = "", until: str = "") -> ExperimentResult:
         result.interpretation = "No commits found in the specified range."
         return result
 
-    # --- Step 2: Classify each commit ---
-    print("\n2. Classifying commits (Layer 4: keyword heuristic)...")
+    # --- Step 2: Classify each commit (Layer 3 + Layer 4 ensemble) ---
+    print("\n2. Classifying commits (Layer 3 diff-stat + Layer 4 keyword ensemble)...")
     classifications: list[tuple[str, GIPhase]] = []
+    l4_classifications: list[GIPhase] = []  # keyword-only for comparison
     for c in commits:
-        phase = classify_commit_message(c["message"])
+        phase = classify_commit_layer3(
+            c["message"],
+            files_added=c.get("files_added", 0),
+            files_modified=c.get("files_modified", 0),
+            files_deleted=c.get("files_deleted", 0),
+            files_renamed=c.get("files_renamed", 0),
+            total_insertions=c.get("total_insertions", 0),
+            total_deletions=c.get("total_deletions", 0),
+            file_paths=c.get("file_paths"),
+        )
         classifications.append((c["date"], phase))
+        l4_classifications.append(classify_commit_message(c["message"]))
 
     phases_only = [p for _, p in classifications]
     overall = gi_ratio(phases_only)
@@ -78,6 +90,19 @@ def run(repo_path: Path, since: str = "", until: str = "") -> ExperimentResult:
     print(f"   Integration: {overall['i_count']} ({overall['i_count']/len(commits)*100:.0f}%)")
     print(f"   Ambiguous: {overall['a_count']} ({overall['a_count']/len(commits)*100:.0f}%)")
     print(f"   GI Ratio: {overall['ratio']:.2f} — {overall['interpretation']}")
+
+    # Layer 4 (keyword-only) comparison
+    l4_ratio = gi_ratio(l4_classifications)
+    l4_ambig_pct = l4_ratio["a_count"] / len(commits) * 100 if commits else 0
+    l3_ambig_pct = overall["a_count"] / len(commits) * 100 if commits else 0
+
+    result.add("l4_ambiguity_pct", round(l4_ambig_pct, 1))
+    result.add("l3_ambiguity_pct", round(l3_ambig_pct, 1))
+
+    print(f"\n   Classifier comparison:")
+    print(f"   Layer 4 (keyword-only) ambiguity: {l4_ratio['a_count']} ({l4_ambig_pct:.1f}%)")
+    print(f"   Layer 3 (ensemble)     ambiguity: {overall['a_count']} ({l3_ambig_pct:.1f}%)")
+    print(f"   Ambiguity reduction: {l4_ambig_pct - l3_ambig_pct:.1f} percentage points")
 
     # --- Step 3: Weekly windowed analysis ---
     print("\n3. Weekly GI rhythm (7-day windows)...")
@@ -137,7 +162,7 @@ def run(repo_path: Path, since: str = "", until: str = "") -> ExperimentResult:
         f"{'healthy GI oscillation' if rhythm['rhythm_score'] > 0.3 else 'potential phase lock'}."
     )
     result.caveats = [
-        "Layer 4 (keyword) classification is coarse; inter-rater agreement untested",
+        "Layer 3 ensemble (keyword + diff-stat + file-type) reduces but does not eliminate ambiguity",
         "Commits vary in size — a 1-file commit and a 50-file commit count equally",
         "Ambiguous commits excluded from ratio; may hide important signals",
     ]

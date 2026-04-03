@@ -17,6 +17,7 @@ from scipy import stats as sp_stats
 
 from cognos_measure.gi import (
     classify_commit_message,
+    classify_commit_layer3,
     gi_ratio,
     sprint_quality_proxies,
     GIPhase,
@@ -67,8 +68,8 @@ def run(repo_path: Path) -> ExperimentResult:
     print("=" * 50)
 
     # --- Step 1: Load commits ---
-    print(f"\n1. Loading Git history from {repo_path}...")
-    commits = list(iter_git_log(repo_path))
+    print(f"\n1. Loading Git history from {repo_path} (with diff stats)...")
+    commits = list(iter_git_log(repo_path, include_stats=True))
     commits.reverse()  # chronological
     print(f"   Loaded {len(commits)} commits")
 
@@ -165,14 +166,15 @@ def run(repo_path: Path) -> ExperimentResult:
     n_segments = len(segment_metrics)
     result.interpretation = (
         f"Analyzed {n_segments} development segments. {balance_finding}. "
-        f"Quality proxy combines fix density (35%), test density (25%), "
-        f"GI balance (25%), documentation (15%)."
+        f"Quality proxy combines fix density (45%), test density (30%), "
+        f"documentation (25%). GI balance excluded from quality to avoid circularity."
     )
     result.caveats = [
         "Quality proxies are commit-derived, not ground-truth quality assessments",
         "Composite score weights are heuristic, not empirically calibrated",
         "Small N (segments) limits statistical power",
         "Sprint date ranges may overlap slightly",
+        "Layer 3 ensemble classifier used (keyword + diff-stat + file-type)",
     ]
     result.metadata = {
         "segments": segment_metrics,

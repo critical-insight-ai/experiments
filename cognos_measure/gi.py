@@ -79,6 +79,87 @@ def classify_file_changes(files_changed: list[str]) -> GIPhase:
     return GIPhase.AMBIGUOUS
 
 
+def classify_commit_layer3(
+    message: str,
+    *,
+    files_added: int = 0,
+    files_modified: int = 0,
+    files_deleted: int = 0,
+    files_renamed: int = 0,
+    total_insertions: int = 0,
+    total_deletions: int = 0,
+    file_paths: list[str] | None = None,
+) -> GIPhase:
+    """Classify a commit using a 3-signal ensemble (Layer 3 + Layer 4).
+
+    Combines:
+      1. Layer 4 (keyword heuristic on message)
+      2. Layer 3a (structural: file add/delete/rename ratios)
+      3. Layer 3b (content flow: insertion vs deletion ratio)
+      4. Tiebreaker: file-type heuristic via classify_file_changes()
+
+    Falls back to keyword-only when diff stats are unavailable (all zeros).
+    """
+    # Signal 1: Layer 4 keyword classification
+    keyword_phase = classify_commit_message(message)
+
+    total_files = files_added + files_modified + files_deleted + files_renamed
+    has_stats = total_files > 0 or total_insertions > 0 or total_deletions > 0
+
+    if not has_stats:
+        # No diff stats — degrade to keyword-only
+        return keyword_phase
+
+    # Signal 2: Layer 3a — structural change type ratio
+    # New files = generation, deleted/renamed = integration (cleanup/restructure)
+    structural_phase = GIPhase.AMBIGUOUS
+    if total_files > 0:
+        gen_signal = files_added
+        int_signal = files_deleted + files_renamed
+        if gen_signal > int_signal:
+            structural_phase = GIPhase.GENERATION
+        elif int_signal > gen_signal:
+            structural_phase = GIPhase.INTEGRATION
+        # If tied or all modified, stays AMBIGUOUS
+
+    # Signal 3: Layer 3b — content flow (net insertions vs deletions)
+    content_phase = GIPhase.AMBIGUOUS
+    total_lines = total_insertions + total_deletions
+    if total_lines > 0:
+        ins_ratio = total_insertions / total_lines
+        if ins_ratio > 0.70:
+            content_phase = GIPhase.GENERATION  # mostly new content
+        elif ins_ratio < 0.30:
+            content_phase = GIPhase.INTEGRATION  # mostly removing/refining
+
+    # Majority voting across 3 signals
+    votes = [keyword_phase, structural_phase, content_phase]
+    g_votes = sum(1 for v in votes if v == GIPhase.GENERATION)
+    i_votes = sum(1 for v in votes if v == GIPhase.INTEGRATION)
+
+    if g_votes >= 2:
+        return GIPhase.GENERATION
+    if i_votes >= 2:
+        return GIPhase.INTEGRATION
+
+    # No majority — if exactly one signal is non-AMBIGUOUS, use it
+    non_ambiguous = [v for v in votes if v != GIPhase.AMBIGUOUS]
+    if len(non_ambiguous) == 1:
+        return non_ambiguous[0]
+
+    # No majority — use file-type tiebreaker if file paths available
+    if file_paths:
+        file_phase = classify_file_changes(file_paths)
+        if file_phase != GIPhase.AMBIGUOUS:
+            return file_phase
+
+    # If keyword gave a clear answer, prefer it over AMBIGUOUS
+    if keyword_phase != GIPhase.AMBIGUOUS:
+        return keyword_phase
+
+    return GIPhase.AMBIGUOUS
+
+
 def gi_ratio(classifications: list[GIPhase]) -> dict[str, Any]:
     """Compute GI ratio and balance from a sequence of classifications.
 
@@ -196,7 +277,7 @@ _DOC_KEYWORDS = {"doc", "readme", "guide", "comment", "changelog", "note"}
 
 
 def sprint_quality_proxies(
-    commits: list[dict[str, str]],
+    commits: list[dict[str, Any]],
     label: str = "",
 ) -> dict[str, Any]:
     """Compute quality proxy metrics for a sprint's commits.
@@ -209,6 +290,8 @@ def sprint_quality_proxies(
 
     Args:
         commits: List of commit dicts with 'message' and 'date'.
+            May also include diff-stat fields (files_added, files_modified, etc.)
+            for Layer 3 classification.
         label: Optional sprint/phase label.
     """
     n = len(commits)
@@ -231,7 +314,20 @@ def sprint_quality_proxies(
         if any(w.startswith(k) for w in words for k in _DOC_KEYWORDS):
             doc_count += 1
 
-        classifications.append(classify_commit_message(c["message"]))
+        # Use Layer 3 ensemble if diff stats are present, otherwise Layer 4
+        if "files_added" in c:
+            classifications.append(classify_commit_layer3(
+                c["message"],
+                files_added=c.get("files_added", 0),
+                files_modified=c.get("files_modified", 0),
+                files_deleted=c.get("files_deleted", 0),
+                files_renamed=c.get("files_renamed", 0),
+                total_insertions=c.get("total_insertions", 0),
+                total_deletions=c.get("total_deletions", 0),
+                file_paths=c.get("file_paths"),
+            ))
+        else:
+            classifications.append(classify_commit_message(c["message"]))
 
     gi = gi_ratio(classifications)
     balance_distance = abs(gi["balance"])
@@ -245,11 +341,13 @@ def sprint_quality_proxies(
     # Score components (each 0-1, weighted):
     fix_score = max(0, 1 - fix_density * 5)       # 0 fixes = 1.0, 20%+ fixes = 0
     test_score = min(1, test_density * 3)           # 33%+ tests = 1.0
-    balance_score = max(0, 1 - balance_distance)    # |balance| < 1 = positive
+    balance_score = max(0, 1 - balance_distance)    # kept as metadata, NOT in quality_score
     maturity_score = min(1, doc_density * 5)        # 20%+ docs = 1.0
 
+    # NOTE: balance_score deliberately excluded from composite to avoid
+    # circularity when correlating GI balance with quality (EX-6.2).
     quality_score = round(
-        (fix_score * 0.35 + test_score * 0.25 + balance_score * 0.25 + maturity_score * 0.15) * 10,
+        (fix_score * 0.45 + test_score * 0.30 + maturity_score * 0.25) * 10,
         2,
     )
 

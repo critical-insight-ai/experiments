@@ -1,24 +1,26 @@
 {
   "experiment": "EX-6.3",
-  "run": "20260403-220048",
+  "run": "20260403-231121",
   "status": "completed",
   "evidence_level": "observational",
   "measurements": {
     "total_commits": 2614,
-    "g_count": 455,
-    "i_count": 1242,
-    "a_count": 917,
-    "overall_gi_ratio": 0.366,
-    "overall_balance": -1.449,
-    "rhythm_score": 0.105,
-    "alternation_count": 39,
-    "dominant_phase": "integration",
+    "g_count": 1909,
+    "i_count": 690,
+    "a_count": 15,
+    "overall_gi_ratio": 2.767,
+    "overall_balance": 1.468,
+    "l4_ambiguity_pct": 35.1,
+    "l3_ambiguity_pct": 0.6,
+    "rhythm_score": 0.161,
+    "alternation_count": 60,
+    "dominant_phase": "generation",
     "mean_daily_commits": 11.88,
     "active_days_pct": 75.0
   },
-  "interpretation": "Analyzed 2614 commits. Overall GI ratio: 0.37 (Strongly integration-heavy (risk: premature convergence)). Rhythm score: 0.10 (Weak oscillation (may indicate phase lock)). The flywheel exhibits potential phase lock.",
+  "interpretation": "Analyzed 2614 commits. Overall GI ratio: 2.77 (Strongly generation-heavy (risk: divergence without convergence)). Rhythm score: 0.16 (Weak oscillation (may indicate phase lock)). The flywheel exhibits potential phase lock.",
   "caveats": [
-    "Layer 4 (keyword) classification is coarse; inter-rater agreement untested",
+    "Layer 3 ensemble (keyword + diff-stat + file-type) reduces but does not eliminate ambiguity",
     "Commits vary in size \u2014 a 1-file commit and a 50-file commit count equally",
     "Ambiguous commits excluded from ratio; may hide important signals"
   ]

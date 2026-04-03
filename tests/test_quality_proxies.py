@@ -59,11 +59,13 @@ def test_quality_components_sum_to_score():
     ]
     result = sprint_quality_proxies(commits)
     components = result["quality_components"]
+    # balance_score is metadata only — NOT included in quality_score
     expected = round(
-        (components["fix_score"] * 0.35 +
-         components["test_score"] * 0.25 +
-         components["balance_score"] * 0.25 +
-         components["maturity_score"] * 0.15) * 10,
+        (components["fix_score"] * 0.45 +
+         components["test_score"] * 0.30 +
+         components["maturity_score"] * 0.25) * 10,
         2,
     )
     assert abs(result["quality_score"] - expected) < 0.01
+    # balance_score should still be present as metadata
+    assert "balance_score" in components
