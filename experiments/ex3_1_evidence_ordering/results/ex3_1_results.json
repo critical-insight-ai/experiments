@@ -1,0 +1,26 @@
+{
+  "experiment": "EX-3.1",
+  "run": "20260403-222320",
+  "status": "completed",
+  "evidence_level": "comparative",
+  "measurements": {
+    "actual_total_inherited": 83,
+    "random_mean_inherited": 83.0,
+    "random_std_inherited": 0.0,
+    "random_median_inherited": 83,
+    "actual_weighted_score": 259.86,
+    "random_mean_weighted": 236.39,
+    "random_std_weighted": 25.4,
+    "p_value": 0.192,
+    "effect_size_cohens_d": 0.924,
+    "n_simulations": 10000,
+    "late_stage_acceleration": 0.977
+  },
+  "interpretation": "Monte Carlo test (10,000 shuffles): Actual ordering front-loads more early inheritance (weighted score 259.9 vs random mean 236.4). Effect size: large (d=0.92). p=0.192 (not statistically significant). Actual build order inherits 83 CRD kinds across 8 steps.",
+  "caveats": [
+    "Inheritance counts CRD kind names, not instances \u2014 a kind used 50x counts same as 1x",
+    "N=1 build sequence (cannot randomize reality, only compare to random baseline)",
+    "Small number of workloads (8) limits statistical resolution",
+    "Blackjack and TTS are prototypes with minimal kinds, reducing late-stage signal"
+  ]
+}

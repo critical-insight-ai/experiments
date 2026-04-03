@@ -1,0 +1,23 @@
+{
+  "experiment": "EX-6.2",
+  "run": "20260403-222036",
+  "status": "completed",
+  "evidence_level": "observational",
+  "measurements": {
+    "spearman_rho_balance_quality": -0.4048,
+    "spearman_p_balance_quality": 0.3199,
+    "spearman_rho_balance_fixes": 0.3095,
+    "spearman_p_balance_fixes": 0.4556,
+    "dev_avg_quality": 3.59,
+    "wl_avg_quality": 2.07,
+    "dev_avg_balance_distance": 1.752,
+    "wl_avg_balance_distance": 1.392
+  },
+  "interpretation": "Analyzed 8 development segments. No significant correlation (p=0.320). Quality proxy combines fix density (35%), test density (25%), GI balance (25%), documentation (15%).",
+  "caveats": [
+    "Quality proxies are commit-derived, not ground-truth quality assessments",
+    "Composite score weights are heuristic, not empirically calibrated",
+    "Small N (segments) limits statistical power",
+    "Sprint date ranges may overlap slightly"
+  ]
+}

@@ -186,3 +186,90 @@ def gi_rhythm_score(windows: list[dict[str, Any]]) -> dict[str, Any]:
             else "Weak oscillation (may indicate phase lock)"
         ),
     }
+
+
+# --- Sprint-level quality proxies ---
+
+_FIX_KEYWORDS = {"fix", "bug", "patch", "hotfix", "workaround", "regression", "broken", "revert"}
+_TEST_KEYWORDS = {"test", "spec", "verify", "validate", "assert", "coverage"}
+_DOC_KEYWORDS = {"doc", "readme", "guide", "comment", "changelog", "note"}
+
+
+def sprint_quality_proxies(
+    commits: list[dict[str, str]],
+    label: str = "",
+) -> dict[str, Any]:
+    """Compute quality proxy metrics for a sprint's commits.
+
+    Quality proxies (higher = better unless noted):
+    - fix_density: fraction of commits that are fixes (lower = better)
+    - test_density: fraction of test-related commits
+    - doc_density: fraction of documentation commits
+    - gi_balance_distance: |log2(G/I)| — distance from perfect balance (lower = better)
+
+    Args:
+        commits: List of commit dicts with 'message' and 'date'.
+        label: Optional sprint/phase label.
+    """
+    n = len(commits)
+    if n == 0:
+        return {"label": label, "n_commits": 0, "quality_score": 0.0}
+
+    fix_count = 0
+    test_count = 0
+    doc_count = 0
+    classifications: list[GIPhase] = []
+
+    for c in commits:
+        msg_lower = c["message"].lower()
+        words = set(msg_lower.split())
+
+        if any(w.startswith(k) for w in words for k in _FIX_KEYWORDS):
+            fix_count += 1
+        if any(w.startswith(k) for w in words for k in _TEST_KEYWORDS):
+            test_count += 1
+        if any(w.startswith(k) for w in words for k in _DOC_KEYWORDS):
+            doc_count += 1
+
+        classifications.append(classify_commit_message(c["message"]))
+
+    gi = gi_ratio(classifications)
+    balance_distance = abs(gi["balance"])
+
+    # Composite quality score (0-10 scale):
+    # Low fix density (+), high test density (+), low GI imbalance (+)
+    fix_density = fix_count / n
+    test_density = test_count / n
+    doc_density = doc_count / n
+
+    # Score components (each 0-1, weighted):
+    fix_score = max(0, 1 - fix_density * 5)       # 0 fixes = 1.0, 20%+ fixes = 0
+    test_score = min(1, test_density * 3)           # 33%+ tests = 1.0
+    balance_score = max(0, 1 - balance_distance)    # |balance| < 1 = positive
+    maturity_score = min(1, doc_density * 5)        # 20%+ docs = 1.0
+
+    quality_score = round(
+        (fix_score * 0.35 + test_score * 0.25 + balance_score * 0.25 + maturity_score * 0.15) * 10,
+        2,
+    )
+
+    return {
+        "label": label,
+        "n_commits": n,
+        "fix_count": fix_count,
+        "fix_density": round(fix_density, 4),
+        "test_count": test_count,
+        "test_density": round(test_density, 4),
+        "doc_count": doc_count,
+        "doc_density": round(doc_density, 4),
+        "gi_ratio": gi["ratio"],
+        "gi_balance": gi["balance"],
+        "balance_distance": round(balance_distance, 3),
+        "quality_score": quality_score,
+        "quality_components": {
+            "fix_score": round(fix_score, 3),
+            "test_score": round(test_score, 3),
+            "balance_score": round(balance_score, 3),
+            "maturity_score": round(maturity_score, 3),
+        },
+    }
