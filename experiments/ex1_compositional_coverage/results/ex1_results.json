@@ -1,26 +1,31 @@
 {
   "experiment": "EX-1",
-  "run": "20260403-215954",
+  "run": "20260404-163156",
   "status": "completed",
   "evidence_level": "observational",
   "measurements": {
-    "union_size": 65,
-    "total_kinds": 164,
-    "coverage_ratio": 0.3963,
-    "universal_kinds": 23,
-    "common_kinds": 12,
-    "domain_specific_kinds": 16,
-    "rare_kinds": 14,
-    "saturation_a": 21.2184,
-    "saturation_b": 23.8734,
-    "saturation_r_squared": 0.8682,
-    "total_yaml_lines": 58207,
-    "sparsity_ratio": 20.2
+    "production_count": 13,
+    "scenario_count": 22,
+    "total_workload_count": 35,
+    "union_size": 120,
+    "total_kinds": 159,
+    "coverage_ratio": 0.7547,
+    "universal_kinds": 9,
+    "common_kinds": 8,
+    "domain_specific_kinds": 68,
+    "rare_kinds": 35,
+    "saturation_a": 31.1616,
+    "saturation_b": 14.0183,
+    "saturation_r_squared": 0.8442,
+    "total_yaml_lines": 74464,
+    "sparsity_ratio": 15.8,
+    "production_union_size": 111,
+    "production_coverage_ratio": 0.6981
   },
-  "interpretation": "CRD vocabulary covers 39.6% of available kinds across 8 workloads spanning 8 domains. Logarithmic saturation (R\u00b2=0.868) indicates compositional completeness: early workloads discover most kinds, later workloads reuse existing vocabulary. Specification sparsity ratio: 20:1.",
+  "interpretation": "CRD vocabulary covers 75.5% of 159 unique kinds across 35 workloads (13 production + 22 scenarios). Production workloads alone activate 69.8%. Logarithmic saturation (R\u00b2=0.844) indicates compositional completeness: early workloads discover most kinds, later workloads reuse existing vocabulary. Specification sparsity ratio: 16:1.",
   "caveats": [
     "N=1 builder: all workloads designed by same person",
-    "60% of CRD kinds remain unactivated",
+    "25% of CRD kinds remain unactivated",
     "No formal proof of completeness; empirical coverage only"
   ]
 }

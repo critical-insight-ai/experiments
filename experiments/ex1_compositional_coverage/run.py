@@ -22,63 +22,113 @@ from cognos_measure.compression import cognitive_load_estimate, specification_sp
 from cognos_measure.io import find_yaml_files, load_all_yaml, extract_crd_kinds
 from cognos_measure.schemas import ExperimentResult, EvidenceLevel, Status
 
-# Workload bundle locations relative to CognOS repo root
-WORKLOAD_PATHS: dict[str, str | list[str]] = {
+# ---------------------------------------------------------------------------
+# Tier 1: Production workloads (deploy/docker/bundles/demos/)
+#   These are full, self-contained workloads built for specific domains.
+# ---------------------------------------------------------------------------
+PRODUCTION_WORKLOADS: dict[str, str] = {
     "agentic-horizons": "deploy/docker/bundles/demos/podcast/agentic-horizons-bundle.yaml",
     "diana": "deploy/docker/bundles/demos/diana/diana-intelligence-workload.yaml",
     "prescience": "deploy/docker/bundles/demos/prescience/prescience-forecasting-workload.yaml",
-    "crucible": "deploy/docker/bundles/demos/crucible",  # directory with multiple files
-    "software-engineering": "deploy/docker/bundles/demos/software-engineering",  # directory
+    "crucible": "deploy/docker/bundles/demos/crucible",
+    "software-engineering": "deploy/docker/bundles/demos/software-engineering",
     "resale": "deploy/docker/bundles/demos/resale/resale-inventory-workload.yaml",
-    "blackjack": "deploy/docker/bundles/demos/blackjack",  # directory
-    "tts": "deploy/docker/bundles/demos/tts",  # directory
+    "blackjack": "deploy/docker/bundles/demos/blackjack",
+    "tts": "deploy/docker/bundles/demos/tts",
+    "cognos-self-monitoring": "deploy/docker/bundles/demos/cognos-self-monitoring",
+    "knowledge-federation": "deploy/docker/bundles/demos/knowledge-federation",
+    "media-production": "deploy/docker/bundles/demos/media-production/media-production-pipeline.yaml",
+    "ml-training": "deploy/docker/bundles/demos/ml-training/ml-training-pipeline.yaml",
+    "security-ops": "deploy/docker/bundles/demos/security-ops",
 }
 
-# Chronological build order for saturation curve
+# ---------------------------------------------------------------------------
+# Tier 2: Scenario bundles (docs/demos/acme-briefing/)
+#   These are capability demos — each explores a CRD combination pattern.
+#   Experiment overlay bundles (ex-6-*) are excluded: they are additive
+#   overlays on a base bundle, not standalone workloads.
+# ---------------------------------------------------------------------------
+SCENARIO_BUNDLES: dict[str, str] = {
+    "acme-briefing": "docs/demos/acme-briefing/acme-briefing-bundle.yaml",
+    "threat-intelligence": "docs/demos/acme-briefing/threat-intelligence-bundle.yaml",
+    "supply-chain": "docs/demos/acme-briefing/supply-chain-analytics-bundle.yaml",
+    "portfolio-analytics": "docs/demos/acme-briefing/portfolio-analytics-bundle.yaml",
+    "web-research": "docs/demos/acme-briefing/web-research-bundle.yaml",
+    "negotiation": "docs/demos/acme-briefing/negotiation-bundle.yaml",
+    "game-theory": "docs/demos/acme-briefing/game-theory-bundle.yaml",
+    "incident-warroom": "docs/demos/acme-briefing/incident-warroom-bundle.yaml",
+    "order-review": "docs/demos/acme-briefing/order-review-bundle.yaml",
+    "iterative-report": "docs/demos/acme-briefing/iterative-report-bundle.yaml",
+    "knowledge-investigation": "docs/demos/acme-briefing/knowledge-investigation-bundle.yaml",
+    "graph-document": "docs/demos/acme-briefing/graph-document-bundle.yaml",
+    "spatial-memory": "docs/demos/acme-briefing/spatial-memory-bundle.yaml",
+    "multi-memory": "docs/demos/acme-briefing/multi-memory-bundle.yaml",
+    "model-hub": "docs/demos/acme-briefing/model-hub-bundle.yaml",
+    "model-routing": "docs/demos/acme-briefing/model-routing-bundle.yaml",
+    "ml-experiment": "docs/demos/acme-briefing/ml-experiment-bundle.yaml",
+    "channel-review": "docs/demos/acme-briefing/channel-review-bundle.yaml",
+    "compliance-audit": "docs/demos/acme-briefing/compliance-audit-bundle.yaml",
+    "doc-automation": "docs/demos/acme-briefing/doc-automation-bundle.yaml",
+    "event-subscription": "docs/demos/acme-briefing/event-subscription-bundle.yaml",
+    "ex-6-7-cooperative-antagonism": "docs/demos/acme-briefing/ex-6-7-cooperative-antagonism-bundle.yaml",
+}
+
+# Chronological build order for saturation curve (production workloads only)
 BUILD_ORDER = [
-    "agentic-horizons",  # Feb 23-28
-    "diana",             # Mar 5-9
-    "prescience",        # Mar 9-14
-    "crucible",          # Mar 13-18
-    "software-engineering",  # Mar 20-Apr 1
-    "resale",            # Design+prototype
-    "blackjack",         # Prototype
-    "tts",               # Prototype
+    "agentic-horizons",       # Feb 23-28
+    "diana",                   # Mar 5-9
+    "prescience",              # Mar 9-14
+    "crucible",                # Mar 13-18
+    "software-engineering",    # Mar 20-Apr 1
+    "resale",                  # Design+prototype
+    "blackjack",               # Prototype
+    "tts",                     # Prototype
+    "cognos-self-monitoring",  # Observability workload
+    "knowledge-federation",    # Cross-tenant knowledge
+    "media-production",        # Media pipeline
+    "ml-training",             # ML pipeline
+    "security-ops",            # SOC autonomous monitoring
 ]
 
-TOTAL_CRD_KINDS = 164
+# Runtime truth from `cognos crds list` (April 4, 2026)
+# 162 registrations across 7 API groups; 159 unique kind names
+# (Document, GateProfile, ProviderBinding each in 2 groups — intentional)
+TOTAL_CRD_KINDS = 159
 PLATFORM_LINES = 1_178_432
 
 
-def load_workload_kinds(cognos_root: Path) -> dict[str, list[str]]:
-    """Load CRD kinds for each workload from YAML bundles."""
-    workloads: dict[str, list[str]] = {}
-
-    for name, rel_path in WORKLOAD_PATHS.items():
-        full_path = cognos_root / rel_path
-        if full_path.is_dir():
-            yaml_files = find_yaml_files(full_path)
-            all_docs = []
-            for f in yaml_files:
-                try:
-                    docs = load_all_yaml(f)
-                    all_docs.extend(d for d in docs if isinstance(d, dict))
-                except Exception as e:
-                    print(f"  Warning: failed to parse {f}: {e}", file=sys.stderr)
-            workloads[name] = extract_crd_kinds(all_docs)
-        elif full_path.is_file():
+def _load_bundle(cognos_root: Path, rel_path: str) -> list[str]:
+    """Load CRD kinds from a single bundle path (file or directory)."""
+    full_path = cognos_root / rel_path
+    if full_path.is_dir():
+        yaml_files = find_yaml_files(full_path)
+        all_docs: list[dict] = []
+        for f in yaml_files:
             try:
-                docs = load_all_yaml(full_path)
-                docs = [d for d in docs if isinstance(d, dict)]
-                workloads[name] = extract_crd_kinds(docs)
+                docs = load_all_yaml(f)
+                all_docs.extend(d for d in docs if isinstance(d, dict))
             except Exception as e:
-                print(f"  Warning: failed to parse {full_path}: {e}", file=sys.stderr)
-                workloads[name] = []
-        else:
-            print(f"  Warning: path not found: {full_path}", file=sys.stderr)
-            workloads[name] = []
+                print(f"  Warning: failed to parse {f}: {e}", file=sys.stderr)
+        return extract_crd_kinds(all_docs)
+    elif full_path.is_file():
+        try:
+            docs = load_all_yaml(full_path)
+            docs = [d for d in docs if isinstance(d, dict)]
+            return extract_crd_kinds(docs)
+        except Exception as e:
+            print(f"  Warning: failed to parse {full_path}: {e}", file=sys.stderr)
+            return []
+    else:
+        print(f"  Warning: path not found: {full_path}", file=sys.stderr)
+        return []
 
-    return workloads
+
+def load_workload_kinds(
+    cognos_root: Path,
+    paths: dict[str, str],
+) -> dict[str, list[str]]:
+    """Load CRD kinds for each workload from YAML bundles."""
+    return {name: _load_bundle(cognos_root, rel) for name, rel in paths.items()}
 
 
 def run(cognos_root: Path) -> ExperimentResult:
@@ -93,11 +143,23 @@ def run(cognos_root: Path) -> ExperimentResult:
     print("EX-1: Compositional Coverage Measurement")
     print("=" * 50)
 
-    # --- Step 1: Load workloads ---
+    # --- Step 1: Load workloads (both tiers) ---
     print("\n1. Loading workload YAML bundles...")
-    workloads = load_workload_kinds(cognos_root)
-    for name, kinds in workloads.items():
+    print("  Tier 1: Production workloads (deploy/docker/bundles/demos/)")
+    production = load_workload_kinds(cognos_root, PRODUCTION_WORKLOADS)
+    for name, kinds in production.items():
         print(f"   {name}: {len(set(kinds))} unique kinds")
+
+    print("  Tier 2: Scenario bundles (docs/demos/acme-briefing/)")
+    scenarios = load_workload_kinds(cognos_root, SCENARIO_BUNDLES)
+    for name, kinds in scenarios.items():
+        print(f"   {name}: {len(set(kinds))} unique kinds")
+
+    # Combined for union/overlap analysis
+    workloads = {**production, **scenarios}
+    result.add("production_count", len(production))
+    result.add("scenario_count", len(scenarios))
+    result.add("total_workload_count", len(workloads))
 
     # --- Step 2: Activation census ---
     print("\n2. Computing activation census...")
@@ -128,9 +190,9 @@ def run(cognos_root: Path) -> ExperimentResult:
     for (a, b), j in sorted(jaccard.items(), key=lambda x: -x[1])[:5]:
         print(f"   {a} <-> {b}: {j:.3f}")
 
-    # --- Step 5: Saturation curve ---
-    print("\n5. Cumulative saturation curve:")
-    ordered = [(name, workloads[name]) for name in BUILD_ORDER if name in workloads]
+    # --- Step 5: Saturation curve (production workloads only — chronological) ---
+    print("\n5. Cumulative saturation curve (production workloads):")
+    ordered = [(name, production[name]) for name in BUILD_ORDER if name in production]
     trajectory = cumulative_saturation(ordered, total_kinds=TOTAL_CRD_KINDS)
     for t in trajectory:
         print(f"   +{t['workload']}: {t['cumulative']} kinds ({t['coverage_ratio']:.1%}), +{t['new_kinds']} new")
@@ -143,6 +205,7 @@ def run(cognos_root: Path) -> ExperimentResult:
 
     # --- Step 6: Compression metrics ---
     print("\n6. Compression metrics:")
+    all_paths = {**PRODUCTION_WORKLOADS, **SCENARIO_BUNDLES}
     total_yaml_lines = sum(
         sum(1 for _ in open(cognos_root / p, encoding="utf-8"))
         if (cognos_root / p).is_file()
@@ -152,7 +215,7 @@ def run(cognos_root: Path) -> ExperimentResult:
         )
         if (cognos_root / p).is_dir()
         else 0
-        for p in WORKLOAD_PATHS.values()
+        for p in all_paths.values()
     )
     sparsity = specification_sparsity(PLATFORM_LINES, total_yaml_lines)
     result.add("total_yaml_lines", total_yaml_lines)
@@ -168,11 +231,19 @@ def run(cognos_root: Path) -> ExperimentResult:
             print(f"   Warning: {name} ({len(set(kinds))} kinds) may exceed cognitive capacity")
 
     # --- Summarize ---
+    # Also compute production-only coverage
+    prod_census = activation_census(production, total_kinds=TOTAL_CRD_KINDS)
+    result.add("production_union_size", prod_census["union_size"])
+    result.add("production_coverage_ratio", round(prod_census["coverage_ratio"], 4))
+    print(f"\n   Production-only coverage: {prod_census['union_size']}/{TOTAL_CRD_KINDS} "
+          f"({prod_census['coverage_ratio']:.1%})")
+
     result.status = Status.COMPLETED
     result.interpretation = (
-        f"CRD vocabulary covers {census['coverage_ratio']:.1%} of available kinds across "
-        f"{len(workloads)} workloads spanning {len(workloads)} domains. "
-        f"Logarithmic saturation (R²={fit['r_squared']:.3f}) indicates compositional completeness: "
+        f"CRD vocabulary covers {census['coverage_ratio']:.1%} of {TOTAL_CRD_KINDS} unique kinds "
+        f"across {len(workloads)} workloads ({len(production)} production + {len(scenarios)} scenarios). "
+        f"Production workloads alone activate {prod_census['coverage_ratio']:.1%}. "
+        f"Logarithmic saturation (R\u00b2={fit['r_squared']:.3f}) indicates compositional completeness: "
         f"early workloads discover most kinds, later workloads reuse existing vocabulary. "
         f"Specification sparsity ratio: {sparsity['label']}."
     )
