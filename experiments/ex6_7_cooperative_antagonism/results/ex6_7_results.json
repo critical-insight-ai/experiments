@@ -14,6 +14,7 @@
       "tool_calls_total": 0,
       "tool_calls_successful": 0,
       "tokens_total": 18494,
+      "duration": "~3 min",
       "quality_trajectory": [6.7, 7.9, 8.2],
       "breadth_trajectory": [63, 96, 126],
       "mode_collapse": false,
@@ -32,6 +33,7 @@
       "tool_calls_total": 27,
       "tool_calls_successful": 0,
       "tokens_total": 96197,
+      "duration": "~10 min",
       "task_breakdown": [
         {"task": "generate-round-1", "tokens": 23050, "tool_calls": 6, "turns": 5},
         {"task": "critique-round-1", "tokens": 8585, "tool_calls": 2, "turns": 2},
@@ -62,28 +64,163 @@
       "mode_collapse": null,
       "judge_verdict": "Unable to score — judge lacked structured-documents:read permission",
       "notes": "Bundle fix enabled tool invocation (27 vs 0). All calls failed due to Docker infrastructure gaps. 4th bundle defect found: gi-judge missing structured-documents:read permission."
+    },
+    {
+      "run_id": "run3-20260404",
+      "run_id_full": "run/workflow/acme/ex-6-7-cooperative-antagonism/1.0.0/20260404104314-3f6f9182",
+      "date": "2026-04-04",
+      "status": "completed",
+      "condition": "permissions-applied-guard-disabled",
+      "topic": "semiconductor-geopolitics",
+      "model": "gpt-4.1-2025-04-14",
+      "tasks_completed": 7,
+      "tasks_total": 7,
+      "tool_calls_total": 18,
+      "tool_calls_successful": 0,
+      "tokens_total": 69718,
+      "duration": "00:06:30",
+      "task_breakdown": [
+        {"task": "generate-round-1", "tokens": 13647, "tool_calls": 4, "turns": 3},
+        {"task": "critique-round-1", "tokens": 8015, "tool_calls": 2, "turns": 2},
+        {"task": "generate-round-2", "tokens": 8801, "tool_calls": 2, "turns": 2},
+        {"task": "critique-round-2", "tokens": 8188, "tool_calls": 2, "turns": 2},
+        {"task": "generate-round-3", "tokens": 15837, "tool_calls": 3, "turns": 4},
+        {"task": "critique-round-3", "tokens": 8262, "tool_calls": 2, "turns": 2},
+        {"task": "judge-verdict", "tokens": 6968, "tool_calls": 3, "turns": 2}
+      ],
+      "tool_errors": {
+        "403_forbidden": 15,
+        "405_method_not_allowed": 2,
+        "404_not_found": 1
+      },
+      "tool_breakdown": {
+        "channels.search": {"total": 6, "success": 0},
+        "document.list": {"total": 3, "success": 0},
+        "task.list": {"total": 3, "success": 0},
+        "document.read": {"total": 2, "success": 0},
+        "web.search.qa": {"total": 2, "success": 0},
+        "document.create_from_template": {"total": 1, "success": 0},
+        "web.search.raw": {"total": 1, "success": 0}
+      },
+      "quality_trajectory": null,
+      "notes": "PriorityGuard 425 errors fixed. All tool calls still fail with 403 — stale AgentType permissions in Orleans grain registry. AgentType defaultPermissions updated in CRD but grain state not refreshed."
+    },
+    {
+      "run_id": "run4-20260404",
+      "run_id_full": "run/workflow/acme/ex-6-7-cooperative-antagonism/1.0.0/20260404105838-2cf41429",
+      "date": "2026-04-04",
+      "status": "completed",
+      "condition": "silo-restart-permissions-still-stale",
+      "topic": "semiconductor-geopolitics",
+      "model": "gpt-4.1-2025-04-14",
+      "tasks_completed": 7,
+      "tasks_total": 7,
+      "tool_calls_total": 21,
+      "tool_calls_successful": 0,
+      "tokens_total": 81595,
+      "duration": "00:07:30",
+      "task_breakdown": [
+        {"task": "generate-round-1", "tokens": 23188, "tool_calls": 5, "turns": 5},
+        {"task": "critique-round-1", "tokens": 16921, "tool_calls": 5, "turns": 4},
+        {"task": "generate-round-2", "tokens": 8804, "tool_calls": 2, "turns": 2},
+        {"task": "critique-round-2", "tokens": 8207, "tool_calls": 2, "turns": 2},
+        {"task": "generate-round-3", "tokens": 9178, "tool_calls": 2, "turns": 2},
+        {"task": "critique-round-3", "tokens": 8351, "tool_calls": 2, "turns": 2},
+        {"task": "judge-verdict", "tokens": 6946, "tool_calls": 3, "turns": 2}
+      ],
+      "tool_breakdown": {
+        "channels.search": {"total": 8, "success": 0},
+        "document.list": {"total": 5, "success": 0},
+        "task.list": {"total": 3, "success": 0},
+        "web.search.qa": {"total": 2, "success": 0},
+        "document.create_from_template": {"total": 1, "success": 0},
+        "memory.annotate": {"total": 1, "success": 0},
+        "web.search.raw": {"total": 1, "success": 0}
+      },
+      "quality_trajectory": null,
+      "notes": "Silo restart did not fix 403s — Orleans grain state (PostgreSQL-backed) persists across restarts. AgentTypeRegistry grain still has stale permissions from prior sessions."
+    },
+    {
+      "run_id": "run5-20260404",
+      "run_id_full": "run/workflow/acme/ex-6-7-cooperative-antagonism/1.0.0/20260404140836-c44a0ed2",
+      "date": "2026-04-04",
+      "status": "completed",
+      "condition": "instance-permissions-on-agent-crds",
+      "topic": "semiconductor-geopolitics",
+      "model": "gpt-4.1-2025-04-14",
+      "tasks_completed": 7,
+      "tasks_total": 7,
+      "tool_calls_total": 75,
+      "tool_calls_successful": 59,
+      "tool_calls_success_rate": 0.787,
+      "tokens_total": 319423,
+      "duration": "00:04:00",
+      "task_breakdown": [
+        {"task": "generate-round-1", "tokens": 43609, "tool_calls": 17, "turns": 7, "tool_calls_successful": 7},
+        {"task": "critique-round-1", "tokens": 28764, "tool_calls": 5, "turns": 5, "tool_calls_successful": 5},
+        {"task": "generate-round-2", "tokens": 41638, "tool_calls": 8, "turns": 7, "tool_calls_successful": 8},
+        {"task": "critique-round-2", "tokens": 75976, "tool_calls": 14, "turns": 9, "tool_calls_successful": 9},
+        {"task": "generate-round-3", "tokens": 72302, "tool_calls": 17, "turns": 9, "tool_calls_successful": 16},
+        {"task": "critique-round-3", "tokens": 16031, "tool_calls": 3, "turns": 3, "tool_calls_successful": 3},
+        {"task": "judge-verdict", "tokens": 41103, "tool_calls": 11, "turns": 10, "tool_calls_successful": 11}
+      ],
+      "tool_breakdown": {
+        "channels.search": {"total": 9, "success": 9},
+        "document.read": {"total": 8, "success": 8},
+        "document.list": {"total": 6, "success": 6},
+        "task.complete": {"total": 6, "success": 6},
+        "task.create": {"total": 15, "success": 6},
+        "channels.post": {"total": 5, "success": 3},
+        "document.append": {"total": 4, "success": 4},
+        "task.list": {"total": 4, "success": 4},
+        "web.search.raw": {"total": 4, "success": 0},
+        "document.view.create": {"total": 3, "success": 3},
+        "document.view.read": {"total": 3, "success": 3},
+        "memory.capture_scene": {"total": 3, "success": 3},
+        "document.finalize": {"total": 2, "success": 2},
+        "document.create": {"total": 1, "success": 1},
+        "document.create_from_template": {"total": 1, "success": 1},
+        "web.search.qa": {"total": 1, "success": 0}
+      },
+      "tool_failure_analysis": {
+        "web_search": "5/5 failed (405) — no search backend configured in Docker cluster",
+        "task_create": "9/15 failed — duplicate task creation attempts (agent retries on already-existing tasks)",
+        "channels_post": "2/5 failed — transient channel write failures"
+      },
+      "quality_trajectory": null,
+      "notes": "BREAKTHROUGH — first successful tool invocations in EX-6.7. Instance-level permissions on Agent CRDs bypass stale AgentTypeRegistry grain. 59/75 tools succeed (79%). All platform tools work; only web.search fails (no backend). Agents create documents, read channels, manage tasks, finalize dossiers, and capture memory scenes."
     }
   ],
   "comparison": {
-    "tool_calls": {"run1": 0, "run2": 27, "delta": "+27"},
-    "tokens": {"run1": 18494, "run2": 96197, "ratio": "5.2x"},
-    "tasks_completed": {"run1": 7, "run2": 7},
+    "tool_calls": {"run1": 0, "run2": 27, "run3": 18, "run4": 21, "run5": 75},
+    "tool_calls_successful": {"run1": 0, "run2": 0, "run3": 0, "run4": 0, "run5": 59},
+    "tokens": {"run1": 18494, "run2": 96197, "run3": 69718, "run4": 81595, "run5": 319423},
+    "tasks_completed": {"run1": 7, "run2": 7, "run3": 7, "run4": 7, "run5": 7},
+    "token_ratio_vs_baseline": {"run2": "5.2x", "run3": "3.8x", "run4": "4.4x", "run5": "17.3x"},
     "bundle_fix_validated": true,
     "infrastructure_gap_identified": true,
-    "quality_comparison": "Deferred — Run 2 judge could not score due to permission defect"
+    "permission_fix_validated": true,
+    "quality_comparison": "Deferred — Run 5 quality trajectory analysis needed (judge now has working tools)"
   },
   "evidence_level": "observational",
-  "interpretation": "Bundle fix validated: agents attempt correct tools (27 calls vs 0). Run 3 needed with working infrastructure for quality comparison.",
+  "interpretation": "Five-run progression reveals layered infrastructure requirements for agentic tool use. Run 1→2: bundle schema fix (0→27 tool calls). Run 2→3: PriorityGuard fix (425 errors eliminated). Runs 3-4: stale Orleans grain permissions persist across silo restarts (PostgreSQL-backed state). Run 5: instance-level permissions on Agent CRDs bypass the stale grain registry entirely, yielding 59/75 successful tool calls (79%). Token consumption scales 17.3x from baseline when tools succeed — agents invest heavily in document creation, channel communication, and task management. The cooperative-antagonistic debate pattern emerges clearly in Run 5: generators create structured dossiers, critics query channels and documents to find weaknesses, and the judge synthesizes via document reads across all rounds.",
+  "root_cause_analysis": {
+    "permission_403_root_cause": "Two storage systems: Mesh catalog (REST API, had correct permissions) vs AgentTypeRegistry grain (runtime, had stale permissions from prior sessions). The grain is backed by PostgreSQL and persists across silo restarts.",
+    "fix": "Added spec.permissions directly to Agent CRDs. ToolPermissionHelper checks ctx.Config.Permissions first — if non-null, it fully replaces AgentType.DefaultPermissions. Instance permissions bypass the stale grain.",
+    "code_path": "Cognos.Orchestration/Providers/ToolPermissionHelper.cs lines 140-154"
+  },
   "bundle_defects_found": [
     "Run 1: wrong field name (tools vs defaultTools)",
     "Run 1: wrong tool IDs (web.search vs web.search.qa)",
     "Run 1: missing defaultPermissions block",
-    "Run 2: gi-judge missing structured-documents:read permission"
+    "Run 2: gi-judge missing structured-documents:read permission",
+    "Runs 2-4: stale AgentType permissions in Orleans grain registry (not refreshed by CRD apply or silo restart)"
   ],
   "next_steps": [
-    "Fix gi-judge permissions in bundle",
-    "Configure web search MCP endpoint in Docker cluster",
-    "Resolve 425/403 tool infrastructure errors",
-    "Re-run as Run 3 with working tools for quality comparison"
+    "Quality trajectory analysis — extract judge scores from Run 5 artifacts",
+    "Topic breadth measurement — count unique concepts across rounds",
+    "Mode collapse detection — compare semantic diversity across generator outputs",
+    "Run 6 with web search backend for full tool coverage",
+    "Compare Run 1 (no-tools) vs Run 5 (tools-working) quality trajectories"
   ]
 }

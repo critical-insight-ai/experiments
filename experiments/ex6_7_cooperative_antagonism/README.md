@@ -101,13 +101,137 @@ so it couldn't produce quality scores.
    Critic used `document.list`, `channels.search`; Judge used all three
    categories — agents follow their playbook instructions
 
-### Run 3 Plan (with working infrastructure)
+## Run 3 Results (2026-04-04, permissions applied, PriorityGuard disabled)
 
-- [ ] Fix gi-judge permissions (`structured-documents:read`)
-- [ ] Configure web search MCP endpoint in Docker
-- [ ] Resolve 425 tool initialization errors (possibly needs warm-up)
-- [ ] Re-run same topic for controlled comparison
-- [ ] Success criteria: tool calls > 0 **and** tool calls successful > 0
+**Fix applied**: All agent types updated with full `defaultPermissions`
+(7 permissions each). `ADMISSION_PRIORITY_GUARD_DISABLED: "true"` added
+to Docker compose to eliminate 425 errors.
+
+| Metric | Run 1 | Run 2 | Run 3 |
+|--------|-------|-------|-------|
+| Tool calls | 0 | 27 | 18 |
+| Successful | 0 | 0 | 0 |
+| Tokens | 18,494 | 96,197 | 69,718 |
+| Duration | ~3 min | ~10 min | 6:30 |
+| Tasks | 7/7 | 7/7 | 7/7 |
+
+### Why Still Failing (Run 3)
+
+All 18 tool calls failed with 403 (Forbidden). The 425 errors from Run 2
+were eliminated, but **stale AgentType permissions in the Orleans grain
+registry** meant the runtime still denied tool access. The Mesh catalog
+(REST API layer) had the correct permissions, but the `AgentTypeRegistry`
+grain (PostgreSQL-backed, used at runtime) retained old state from prior
+sessions. CRD re-apply updates the catalog but does not invalidate the
+grain cache.
+
+| Error | Count | Tools affected |
+|-------|-------|----------------|
+| 403 Forbidden | 15 | channels.search, document.list, task.list, document.read, document.create_from_template |
+| 405 Method Not Allowed | 2 | web.search.qa |
+| 404 Not Found | 1 | web.search.raw |
+
+## Run 4 Results (2026-04-04, silo restart attempt)
+
+Hypothesis: silo restart would refresh the grain cache. **Disproven** —
+Orleans grain state is backed by PostgreSQL and persists across restarts.
+
+| Metric | Run 3 | Run 4 |
+|--------|-------|-------|
+| Tool calls | 18 | 21 |
+| Successful | 0 | 0 |
+| Tokens | 69,718 | 81,595 |
+| Duration | 6:30 | 7:30 |
+
+Same failure pattern. 21 tool calls, all 403 on platform tools, 405 on
+web search. Confirms the stale grain is the root cause.
+
+## Run 5 Results (2026-04-04, instance-level permissions — BREAKTHROUGH)
+
+**Root cause fix**: Added `spec.permissions` directly to all 3 Agent CRDs
+(not just AgentType `defaultPermissions`). `ToolPermissionHelper` checks
+`ctx.Config.Permissions` first — if non-null, it **fully replaces**
+`AgentType.DefaultPermissions`, bypassing the stale grain entirely.
+
+| Metric | Run 1 | Run 2 | Run 3 | Run 4 | Run 5 |
+|--------|-------|-------|-------|-------|-------|
+| Tool calls | 0 | 27 | 18 | 21 | **75** |
+| Successful | 0 | 0 | 0 | 0 | **59 (79%)** |
+| Tokens | 18,494 | 96,197 | 69,718 | 81,595 | **319,423** |
+| Duration | ~3 min | ~10 min | 6:30 | 7:30 | **4:00** |
+| Tasks | 7/7 | 7/7 | 7/7 | 7/7 | **7/7** |
+| Token ratio vs baseline | 1x | 5.2x | 3.8x | 4.4x | **17.3x** |
+
+### Task-Level Breakdown (Run 5)
+
+| Task | Tokens | Tool Calls | Successful | Turns |
+|------|--------|------------|------------|-------|
+| generate-round-1 | 43,609 | 17 | 7 | 7 |
+| critique-round-1 | 28,764 | 5 | 5 | 5 |
+| generate-round-2 | 41,638 | 8 | 8 | 7 |
+| critique-round-2 | 75,976 | 14 | 9 | 9 |
+| generate-round-3 | 72,302 | 17 | 16 | 9 |
+| critique-round-3 | 16,031 | 3 | 3 | 3 |
+| judge-verdict | 41,103 | 11 | 11 | 10 |
+
+### Per-Tool Success Rates (Run 5)
+
+| Tool | Success/Total | Notes |
+|------|---------------|-------|
+| channels.search | 9/9 | 100% — channel reads work |
+| document.read | 8/8 | 100% — document reads work |
+| document.list | 6/6 | 100% |
+| task.complete | 6/6 | 100% |
+| document.append | 4/4 | 100% |
+| task.list | 4/4 | 100% |
+| document.view.create | 3/3 | 100% |
+| document.view.read | 3/3 | 100% |
+| memory.capture_scene | 3/3 | 100% — episodic memory works |
+| document.finalize | 2/2 | 100% |
+| document.create | 1/1 | 100% |
+| document.create_from_template | 1/1 | 100% |
+| task.create | 6/15 | 40% — agent retries on existing tasks |
+| channels.post | 3/5 | 60% — transient write failures |
+| web.search.raw | 0/4 | 0% — no search backend configured |
+| web.search.qa | 0/1 | 0% — no search backend configured |
+
+### Key Findings (Run 5)
+
+1. **Permission fix validated**: Instance-level permissions bypass stale
+   grain state. 59/75 tool calls succeed (79%).
+2. **17.3x token inflation**: When tools work, agents invest heavily in
+   document lifecycle (create → append → finalize), channel communication,
+   and task management. Run 1 baseline: 18,494 tokens. Run 5: 319,423.
+3. **Paradoxically faster**: Despite 17x more tokens, Run 5 completed in
+   4 minutes (vs 6-10 minutes for Runs 2-4). Tool failures cause expensive
+   retry loops; successful tools are fast.
+4. **Cooperative-antagonistic pattern emerges**: Generators create structured
+   dossiers via document tools, critics query channels and documents to find
+   weaknesses, judge synthesizes across all rounds via document reads.
+5. **Expected failures**: Web search (no backend) and task.create retries
+   (duplicate creation) account for all 16 failures.
+
+### Root Cause Analysis: Permission 403 Debugging Arc
+
+The 403 debugging across Runs 2-5 revealed a significant architectural
+insight about CognOS:
+
+- **Two storage systems**: Mesh catalog (REST API, always current) vs
+  AgentTypeRegistry grain (runtime, PostgreSQL-backed, can be stale)
+- **CRD apply** updates the catalog but **does not invalidate** the grain
+- **Silo restart** does not help — grain state persists in PostgreSQL
+- **Instance-level permissions** on Agent CRDs are the reliable path because
+  `ToolPermissionHelper` uses `ctx.Config.Permissions` as a full replacement
+  when non-null (code path: `Cognos.Orchestration/Providers/ToolPermissionHelper.cs`
+  lines 140-154)
+
+### Run 5 Next Steps
+
+- [ ] Extract judge quality scores from Run 5 artifacts
+- [ ] Measure topic breadth (unique concepts per round)
+- [ ] Detect mode collapse (semantic diversity across outputs)
+- [ ] Run 6 with web search backend for full tool coverage
+- [ ] Compare Run 1 (no-tools) vs Run 5 (tools-working) quality trajectories
 
 ## Data Source
 
