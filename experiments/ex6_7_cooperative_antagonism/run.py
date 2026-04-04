@@ -27,6 +27,8 @@ import time
 from pathlib import Path
 from typing import Any
 
+import yaml
+
 from cognos_measure.schemas import ExperimentResult, EvidenceLevel, Status
 
 
@@ -213,6 +215,67 @@ def compare_runs(run1: dict[str, Any], run2: dict[str, Any]) -> None:
     print(f"{'Rounds to Q>=8.0':<30s} {r1:>12s} {r2:>12s}")
 
 
+def validate_bundle(bundle_path: Path) -> list[str]:
+    """Pre-flight checks on the CRD bundle before submission.
+
+    Returns a list of warning/error messages. Empty list = all checks pass.
+    """
+    issues: list[str] = []
+    try:
+        with open(bundle_path, encoding="utf-8") as f:
+            docs = list(yaml.safe_load_all(f))
+    except Exception as exc:
+        return [f"Cannot parse bundle YAML: {exc}"]
+
+    # Collect all CRD kinds
+    kinds = [d.get("kind", "?") for d in docs if d]
+
+    # Check 1: AgentType uses defaultTools (not tools)
+    for doc in docs:
+        if not doc or doc.get("kind") != "AgentType":
+            continue
+        spec = doc.get("spec", {})
+        agent_id = doc.get("metadata", {}).get("id", "?")
+        if "tools" in spec and "defaultTools" not in spec:
+            issues.append(
+                f"AgentType '{agent_id}' uses 'tools:' instead of 'defaultTools:'. "
+                f"Tools will not be registered. Use 'defaultTools:' with '- toolId: ...' entries."
+            )
+        dt = spec.get("defaultTools", [])
+        if dt:
+            for entry in dt:
+                if isinstance(entry, str):
+                    issues.append(
+                        f"AgentType '{agent_id}' has bare string in defaultTools: '{entry}'. "
+                        f"Use '- toolId: {entry}' format."
+                    )
+            # Check for generic web.search/web.browse (should be specific IDs)
+            tool_ids = [
+                (e.get("toolId") if isinstance(e, dict) else e) for e in dt
+            ]
+            for tid in tool_ids:
+                if tid == "web.search":
+                    issues.append(
+                        f"AgentType '{agent_id}': 'web.search' is not a registered tool. "
+                        f"Use 'web.search.qa' and/or 'web.search.raw'."
+                    )
+                if tid == "web.browse":
+                    issues.append(
+                        f"AgentType '{agent_id}': 'web.browse' is not a registered tool. "
+                        f"Use 'web.browse.scroll' and/or 'web.browse.links'."
+                    )
+
+    # Check 2: SemanticMemoryProfile present (needed for memory.search)
+    if "SemanticMemoryProfile" not in kinds:
+        issues.append("No SemanticMemoryProfile in bundle — memory.search tools will fail.")
+
+    # Check 3: At least one workflow
+    if "Workflow" not in kinds:
+        issues.append("No Workflow CRD in bundle.")
+
+    return issues
+
+
 def run_workflow(
     server: str,
     tenant: str,
@@ -351,6 +414,16 @@ def run(
             result.status = Status.FAILED
             result.interpretation = "Missing CLI arguments for live workflow execution"
             return result
+
+        # Pre-flight validation
+        print(f"\nPre-flight: validating bundle {bundle_path}...")
+        issues = validate_bundle(bundle_path)
+        if issues:
+            for issue in issues:
+                print(f"   WARNING: {issue}")
+            print(f"   {len(issues)} issue(s) found — run may not produce tool calls")
+        else:
+            print("   All pre-flight checks passed")
 
         output_dir = run_workflow(server, tenant, bundle_path, token, output_base)
         if output_dir is None:

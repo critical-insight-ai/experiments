@@ -23,12 +23,40 @@ improvement across rounds and no mode collapse.
 - **Tool calls**: 0 (agents operated from prompts only)
 - **Topic**: Semiconductor geopolitics
 
+### Run 1 Root Cause: Zero Tool Calls
+
+The bundle had two defects that prevented all tool invocation:
+
+1. **Wrong field name**: AgentType used `tools:` (flat string list) instead of
+   `defaultTools:` (list of `{toolId}` objects). The platform ignores `tools:`.
+2. **Wrong tool IDs**: `web.search` and `web.browse` are not registered tools.
+   Correct IDs: `web.search.qa`, `web.search.raw`, `web.fetch`,
+   `web.browse.scroll`, `web.browse.links`.
+3. **Missing permissions**: `defaultPermissions.permissions` was absent
+   (agents need `data:access` + `data:read` for web/document tools).
+
+The LLM received task prompts referencing tools but the orchestration engine
+had no tools to offer. The model simulated the adversarial pattern entirely
+from internal reasoning — still achieving Q 8.2, but without actual web
+research, document creation, or channel communication.
+
+**Fix applied**: Bundle updated to use `defaultTools` with correct specific
+tool IDs and `defaultPermissions` block. Skills' `toolIds` also corrected.
+
 ## Run 2 Plan (with tool invocation)
 
 - Same topic (semiconductor geopolitics) for controlled comparison
-- Verify tool providers are configured and agents have tool access
-- Success criteria: quality ≥ 8.0 final, tool calls > 0, no mode collapse
+- Success criteria: quality ≥ 8.0 final, **tool calls > 0**, no mode collapse
 - Key comparison: does tool access improve quality trajectory or breadth?
+
+### Run 2 Pre-Flight Checklist
+
+- [ ] Bundle has `defaultTools` with `- toolId:` entries (auto-validated by runner)
+- [ ] Docker cluster running on port 8080
+- [ ] Keycloak token obtained for `acme` tenant
+- [ ] `web.search.qa` returns results (test: `cognos tools test web.search.qa ...`)
+- [ ] SemanticMemoryProfile applied with working vector store binding
+- [ ] Model supports function calling (gpt-4.1 confirmed)
 
 ## Data Source
 

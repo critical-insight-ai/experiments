@@ -2,6 +2,15 @@
 
 Tests H-1.2: balanced GI ratios correlate with higher-quality outputs.
 
+Uses three complementary segmentation strategies to maximise statistical
+power from a single repository's history:
+
+  1. **Weekly bins** (primary) — ISO-week non-overlapping bins give N ~ 17-18
+     data points and serve as the main Spearman test.
+  2. **Bootstrap permutation** — 10 000-resample CI on rho for robustness.
+  3. **Named phases** (secondary) — original 8 hand-curated segments for
+     interpretive colour (dev vs workload, phase ranking).
+
 Usage:
     python -m experiments.ex6_2_gi_quality.run --repo C:\\Source\\CriticalInsight\\Cognos
 """
@@ -10,6 +19,8 @@ from __future__ import annotations
 
 import argparse
 import json
+from collections import defaultdict
+from datetime import datetime
 from pathlib import Path
 
 import numpy as np
@@ -26,13 +37,11 @@ from cognos_measure.io import iter_git_log
 from cognos_measure.schemas import ExperimentResult, EvidenceLevel, Status
 
 
-# Development phases + workload sprints for granular analysis
-SEGMENTS = [
-    # Major development phases
+# Development phases + workload sprints for interpretive context
+NAMED_SEGMENTS = [
     ("P1: Hardening", "2025-12-03", "2025-12-31"),
     ("P2: Surface polish", "2026-01-01", "2026-01-31"),
     ("P3: Release prep", "2026-02-01", "2026-02-14"),
-    # Workload sprints (more granular)
     ("WL: Agentic Horizons", "2026-02-23", "2026-02-28"),
     ("WL: DIANA", "2026-03-05", "2026-03-09"),
     ("WL: Prescience", "2026-03-09", "2026-03-14"),
@@ -40,19 +49,103 @@ SEGMENTS = [
     ("WL: Software Engineering", "2026-03-20", "2026-04-01"),
 ]
 
+# Minimum commits per bin to compute meaningful quality metrics
+MIN_BIN_SIZE = 5
+
 
 def segment_commits(
-    commits: list[dict[str, str]],
+    commits: list[dict],
     segments: list[tuple[str, str, str]],
-) -> dict[str, list[dict[str, str]]]:
+) -> dict[str, list[dict]]:
     """Assign commits to named segments by date range."""
-    result: dict[str, list[dict[str, str]]] = {}
+    result: dict[str, list[dict]] = {}
     for label, start, end in segments:
         result[label] = [
             c for c in commits
             if start <= c["date"][:10] <= end
         ]
     return result
+
+
+def auto_segment_weekly(commits: list[dict]) -> list[tuple[str, list[dict]]]:
+    """Group commits by ISO week, returning (label, commits) pairs.
+
+    Only returns weeks with >= MIN_BIN_SIZE commits so that quality
+    metrics are statistically meaningful.
+    """
+    by_week: dict[str, list[dict]] = defaultdict(list)
+    for c in commits:
+        dt = datetime.fromisoformat(c["date"][:10])
+        iso_year, iso_week, _ = dt.isocalendar()
+        key = f"{iso_year}-W{iso_week:02d}"
+        by_week[key].append(c)
+
+    # Sort by week label and filter out small bins
+    return [
+        (label, week_commits)
+        for label, week_commits in sorted(by_week.items())
+        if len(week_commits) >= MIN_BIN_SIZE
+    ]
+
+
+def bootstrap_spearman(
+    x: np.ndarray,
+    y: np.ndarray,
+    n_resamples: int = 10_000,
+    ci: float = 0.95,
+    seed: int = 42,
+) -> dict[str, float]:
+    """Bootstrap confidence interval on Spearman rho.
+
+    Returns dict with rho, p, ci_lo, ci_hi, resampled_mean.
+    """
+    rng = np.random.default_rng(seed)
+    n = len(x)
+    rho_obs, p_obs = sp_stats.spearmanr(x, y)
+
+    rhos = np.empty(n_resamples, dtype=np.float64)
+    for i in range(n_resamples):
+        idx = rng.integers(0, n, size=n)
+        r, _ = sp_stats.spearmanr(x[idx], y[idx])
+        rhos[i] = r
+
+    alpha = (1 - ci) / 2
+    ci_lo = float(np.nanpercentile(rhos, 100 * alpha))
+    ci_hi = float(np.nanpercentile(rhos, 100 * (1 - alpha)))
+
+    # Permutation p-value: fraction of resamples with |rho| >= |observed|
+    perm_rhos = np.empty(n_resamples, dtype=np.float64)
+    for i in range(n_resamples):
+        y_perm = rng.permutation(y)
+        r, _ = sp_stats.spearmanr(x, y_perm)
+        perm_rhos[i] = r
+    perm_p = float(np.mean(np.abs(perm_rhos) >= abs(rho_obs)))
+
+    return {
+        "rho": round(float(rho_obs), 4),
+        "p_spearman": round(float(p_obs), 4),
+        "p_permutation": round(perm_p, 4),
+        "ci_lo": round(ci_lo, 4),
+        "ci_hi": round(ci_hi, 4),
+        "bootstrap_mean": round(float(np.nanmean(rhos)), 4),
+        "n": int(n),
+    }
+
+
+def _spearman_if_enough(x: np.ndarray, y: np.ndarray, label: str) -> dict[str, float] | None:
+    """Compute Spearman + bootstrap if enough data points."""
+    if len(x) < 4:
+        print(f"   {label}: N={len(x)} — insufficient (need >= 4)")
+        return None
+    bs = bootstrap_spearman(x, y)
+    print(
+        f"   {label} (N={bs['n']}): "
+        f"rho={bs['rho']:+.3f}, "
+        f"p(Spearman)={bs['p_spearman']:.3f}, "
+        f"p(perm)={bs['p_permutation']:.3f}, "
+        f"95% CI [{bs['ci_lo']:+.3f}, {bs['ci_hi']:+.3f}]"
+    )
+    return bs
 
 
 def run(repo_path: Path) -> ExperimentResult:
@@ -65,7 +158,7 @@ def run(repo_path: Path) -> ExperimentResult:
     )
 
     print("EX-6.2: GI Balance vs Quality Correlation")
-    print("=" * 50)
+    print("=" * 60)
 
     # --- Step 1: Load commits ---
     print(f"\n1. Loading Git history from {repo_path} (with diff stats)...")
@@ -73,23 +166,91 @@ def run(repo_path: Path) -> ExperimentResult:
     commits.reverse()  # chronological
     print(f"   Loaded {len(commits)} commits")
 
-    # --- Step 2: Segment commits ---
-    print("\n2. Segmenting into development phases and workload sprints...")
-    segmented = segment_commits(commits, SEGMENTS)
-    for label, seg_commits in segmented.items():
-        print(f"   {label}: {len(seg_commits)} commits")
+    # ===================================================================
+    # PRIMARY ANALYSIS: Weekly segmentation (maximise N)
+    # ===================================================================
+    print(f"\n2. Weekly segmentation (min {MIN_BIN_SIZE} commits/week)...")
+    weekly_bins = auto_segment_weekly(commits)
+    print(f"   {len(weekly_bins)} weeks with >= {MIN_BIN_SIZE} commits")
 
-    # --- Step 3: Compute quality proxies per segment ---
-    print("\n3. Computing quality proxies per segment...")
-    segment_metrics: list[dict] = []
-    for label, seg_commits in segmented.items():
+    weekly_metrics: list[dict] = []
+    for label, week_commits in weekly_bins:
+        metrics = sprint_quality_proxies(week_commits, label=label)
+        weekly_metrics.append(metrics)
+
+    # Print compact table
+    print(f"\n   {'Week':<12s} {'N':>4s} {'Q':>6s} {'GI':>6s} {'|bal|':>6s} {'fix%':>6s}")
+    print(f"   {'-'*42}")
+    for m in weekly_metrics:
+        print(
+            f"   {m['label']:<12s} {m['n_commits']:>4d} "
+            f"{m['quality_score']:>6.1f} {m['gi_ratio']:>6.2f} "
+            f"{m['balance_distance']:>6.2f} {m['fix_density']:>6.1%}"
+        )
+
+    # Correlation on weekly bins
+    print(f"\n3. Correlation analysis (weekly, N={len(weekly_metrics)})...")
+    w_balance = np.array([m["balance_distance"] for m in weekly_metrics])
+    w_quality = np.array([m["quality_score"] for m in weekly_metrics])
+    w_fix = np.array([m["fix_density"] for m in weekly_metrics])
+
+    bs_quality = _spearman_if_enough(w_balance, w_quality, "|balance| vs quality")
+    bs_fix = _spearman_if_enough(w_balance, w_fix, "|balance| vs fix_density")
+
+    if bs_quality:
+        result.add("weekly_rho_balance_quality", bs_quality["rho"])
+        result.add("weekly_p_spearman", bs_quality["p_spearman"])
+        result.add("weekly_p_permutation", bs_quality["p_permutation"])
+        result.add("weekly_ci_lo", bs_quality["ci_lo"])
+        result.add("weekly_ci_hi", bs_quality["ci_hi"])
+        result.add("weekly_n", bs_quality["n"])
+    if bs_fix:
+        result.add("weekly_rho_balance_fixes", bs_fix["rho"])
+        result.add("weekly_p_fixes_perm", bs_fix["p_permutation"])
+
+    # Interpret the primary result
+    if bs_quality:
+        rho_q = bs_quality["rho"]
+        p_perm = bs_quality["p_permutation"]
+        ci_lo = bs_quality["ci_lo"]
+        ci_hi = bs_quality["ci_hi"]
+
+        if p_perm < 0.05 and rho_q < 0:
+            weekly_finding = (
+                f"Significant: closer to GI balance = higher quality "
+                f"(rho={rho_q:+.3f}, p_perm={p_perm:.3f}, CI [{ci_lo:+.3f},{ci_hi:+.3f}])"
+            )
+        elif p_perm < 0.05 and rho_q > 0:
+            weekly_finding = (
+                f"Significant but reversed: GI imbalance correlates with HIGHER quality "
+                f"(rho={rho_q:+.3f}, p_perm={p_perm:.3f}, CI [{ci_lo:+.3f},{ci_hi:+.3f}])"
+            )
+        elif ci_lo > 0 or ci_hi < 0:
+            weekly_finding = (
+                f"CI excludes zero (directional signal): rho={rho_q:+.3f}, "
+                f"CI [{ci_lo:+.3f},{ci_hi:+.3f}], p_perm={p_perm:.3f}"
+            )
+        else:
+            weekly_finding = (
+                f"No significant correlation: rho={rho_q:+.3f}, "
+                f"p_perm={p_perm:.3f}, CI [{ci_lo:+.3f},{ci_hi:+.3f}]"
+            )
+        print(f"\n   Weekly finding: {weekly_finding}")
+    else:
+        weekly_finding = "Insufficient weekly bins"
+
+    # ===================================================================
+    # SECONDARY ANALYSIS: Named segments (interpretive context)
+    # ===================================================================
+    print(f"\n4. Named segments (interpretive context)...")
+    named_segmented = segment_commits(commits, NAMED_SEGMENTS)
+    named_metrics: list[dict] = []
+    for label, seg_commits in named_segmented.items():
         if len(seg_commits) < 3:
-            print(f"   {label}: skipped (only {len(seg_commits)} commits)")
+            print(f"   {label}: skipped ({len(seg_commits)} commits)")
             continue
-
         metrics = sprint_quality_proxies(seg_commits, label=label)
-        segment_metrics.append(metrics)
-
+        named_metrics.append(metrics)
         print(
             f"   {label}: Q={metrics['quality_score']:.1f}/10, "
             f"GI={metrics['gi_ratio']:.2f}, "
@@ -98,45 +259,21 @@ def run(repo_path: Path) -> ExperimentResult:
             f"test={metrics['test_density']:.1%}"
         )
 
-    # --- Step 4: Correlation analysis ---
-    print("\n4. Correlation analysis: |GI balance| vs quality score...")
-    if len(segment_metrics) >= 4:
-        balance_distances = np.array([m["balance_distance"] for m in segment_metrics])
-        quality_scores = np.array([m["quality_score"] for m in segment_metrics])
-        fix_densities = np.array([m["fix_density"] for m in segment_metrics])
+    # Named-segment correlation (for comparison with previous run)
+    print(f"\n5. Named-segment correlation (N={len(named_metrics)}, for comparison)...")
+    if len(named_metrics) >= 4:
+        n_balance = np.array([m["balance_distance"] for m in named_metrics])
+        n_quality = np.array([m["quality_score"] for m in named_metrics])
+        bs_named = _spearman_if_enough(n_balance, n_quality, "|balance| vs quality (named)")
+        if bs_named:
+            result.add("named_rho_balance_quality", bs_named["rho"])
+            result.add("named_p_permutation", bs_named["p_permutation"])
+            result.add("named_n", bs_named["n"])
 
-        # Spearman correlation: balance_distance vs quality (expect negative — closer to balance = higher quality)
-        rho_quality, p_quality = sp_stats.spearmanr(balance_distances, quality_scores)
-        # Spearman correlation: balance_distance vs fix density (expect positive — imbalance = more fixes)
-        rho_fix, p_fix = sp_stats.spearmanr(balance_distances, fix_densities)
-
-        result.add("spearman_rho_balance_quality", round(float(rho_quality), 4))
-        result.add("spearman_p_balance_quality", round(float(p_quality), 4))
-        result.add("spearman_rho_balance_fixes", round(float(rho_fix), 4))
-        result.add("spearman_p_balance_fixes", round(float(p_fix), 4))
-
-        print(f"   |balance| vs quality: rho={rho_quality:.3f}, p={p_quality:.3f}")
-        print(f"   |balance| vs fix_density: rho={rho_fix:.3f}, p={p_fix:.3f}")
-
-        # Interpretation
-        if p_quality < 0.05 and rho_quality < 0:
-            balance_finding = "Significant negative correlation: closer to GI balance = higher quality"
-        elif p_quality < 0.05 and rho_quality > 0:
-            balance_finding = "Unexpected: GI imbalance correlates with HIGHER quality (integration-heavy phases may be healthy)"
-        else:
-            balance_finding = f"No significant correlation (p={p_quality:.3f})"
-
-        print(f"\n   Finding: {balance_finding}")
-    else:
-        balance_finding = "Insufficient segments for correlation (need >= 4)"
-        rho_quality = float("nan")
-        p_quality = float("nan")
-        print(f"   {balance_finding}")
-
-    # --- Step 5: Phase comparison ---
-    print("\n5. Phase comparison (development vs workload sprints):")
-    dev_phases = [m for m in segment_metrics if m["label"].startswith("P")]
-    wl_sprints = [m for m in segment_metrics if m["label"].startswith("WL")]
+    # Phase comparison
+    print(f"\n6. Phase comparison (development vs workload sprints):")
+    dev_phases = [m for m in named_metrics if m["label"].startswith("P")]
+    wl_sprints = [m for m in named_metrics if m["label"].startswith("WL")]
 
     if dev_phases and wl_sprints:
         dev_avg_quality = np.mean([m["quality_score"] for m in dev_phases])
@@ -149,42 +286,46 @@ def run(repo_path: Path) -> ExperimentResult:
         result.add("dev_avg_balance_distance", round(float(dev_avg_balance), 3))
         result.add("wl_avg_balance_distance", round(float(wl_avg_balance), 3))
 
-        print(f"   Development phases: avg quality={dev_avg_quality:.1f}, avg |balance|={dev_avg_balance:.2f}")
-        print(f"   Workload sprints:   avg quality={wl_avg_quality:.1f}, avg |balance|={wl_avg_balance:.2f}")
+        print(f"   Development phases: avg Q={dev_avg_quality:.1f}, avg |balance|={dev_avg_balance:.2f}")
+        print(f"   Workload sprints:   avg Q={wl_avg_quality:.1f}, avg |balance|={wl_avg_balance:.2f}")
 
-    # --- Step 6: Ranked segments ---
-    print("\n6. Segments ranked by quality score:")
-    for m in sorted(segment_metrics, key=lambda x: -x["quality_score"]):
+    # Ranked segments
+    print(f"\n7. Named segments ranked by quality score:")
+    for m in sorted(named_metrics, key=lambda x: -x["quality_score"]):
         print(
             f"   {m['quality_score']:5.1f}/10  {m['label']:<25s}  "
             f"GI={m['gi_ratio']:.2f}  |bal|={m['balance_distance']:.2f}  "
             f"fix={m['fix_density']:.1%}"
         )
 
-    # --- Summarize ---
+    # ===================================================================
+    # SUMMARY
+    # ===================================================================
     result.status = Status.COMPLETED
-    n_segments = len(segment_metrics)
+    n_weekly = len(weekly_metrics)
+    n_named = len(named_metrics)
     result.interpretation = (
-        f"Analyzed {n_segments} development segments. {balance_finding}. "
-        f"Quality proxy combines fix density (45%), test density (30%), "
-        f"documentation (25%). GI balance excluded from quality to avoid circularity."
+        f"Weekly segmentation (N={n_weekly}) — {weekly_finding}. "
+        f"Named segments (N={n_named}) for interpretive context. "
+        f"Quality proxy: fix density (45%), test density (30%), "
+        f"documentation (25%). GI balance excluded to avoid circularity."
     )
     result.caveats = [
         "Quality proxies are commit-derived, not ground-truth quality assessments",
         "Composite score weights are heuristic, not empirically calibrated",
-        "Small N (segments) limits statistical power",
-        "Sprint date ranges may overlap slightly",
+        "Weekly bins vary in commit count (heteroskedasticity risk)",
+        "Bootstrap CI assumes exchangeability of weekly observations",
+        "Named segment date ranges may overlap slightly",
         "Layer 3 ensemble classifier used (keyword + diff-stat + file-type)",
     ]
     result.metadata = {
-        "segments": segment_metrics,
-        "correlation": {
-            "rho_balance_quality": round(float(rho_quality), 4) if not np.isnan(rho_quality) else None,
-            "p_balance_quality": round(float(p_quality), 4) if not np.isnan(p_quality) else None,
-        },
+        "weekly_metrics": weekly_metrics,
+        "named_metrics": named_metrics,
+        "weekly_correlation": bs_quality if bs_quality else None,
+        "weekly_fix_correlation": bs_fix if bs_fix else None,
     }
 
-    print("\n" + "=" * 50)
+    print(f"\n{'='*60}")
     print(f"Result: {result.interpretation}")
 
     return result

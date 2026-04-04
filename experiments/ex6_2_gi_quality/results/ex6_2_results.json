@@ -1,24 +1,32 @@
 {
   "experiment": "EX-6.2",
-  "run": "20260403-231624",
+  "run": "20260404-000012",
   "status": "completed",
   "evidence_level": "observational",
   "measurements": {
-    "spearman_rho_balance_quality": 0.4524,
-    "spearman_p_balance_quality": 0.2604,
-    "spearman_rho_balance_fixes": -0.5476,
-    "spearman_p_balance_fixes": 0.16,
+    "weekly_rho_balance_quality": 0.1921,
+    "weekly_p_spearman": 0.3575,
+    "weekly_p_permutation": 0.3566,
+    "weekly_ci_lo": -0.2745,
+    "weekly_ci_hi": 0.5725,
+    "weekly_n": 25,
+    "weekly_rho_balance_fixes": -0.3285,
+    "weekly_p_fixes_perm": 0.1075,
+    "named_rho_balance_quality": 0.4524,
+    "named_p_permutation": 0.2701,
+    "named_n": 8,
     "dev_avg_quality": 4.79,
     "wl_avg_quality": 2.7,
     "dev_avg_balance_distance": 1.958,
     "wl_avg_balance_distance": 1.286
   },
-  "interpretation": "Analyzed 8 development segments. No significant correlation (p=0.260). Quality proxy combines fix density (45%), test density (30%), documentation (25%). GI balance excluded from quality to avoid circularity.",
+  "interpretation": "Weekly segmentation (N=25) \u2014 No significant correlation: rho=+0.192, p_perm=0.357, CI [-0.275,+0.573]. Named segments (N=8) for interpretive context. Quality proxy: fix density (45%), test density (30%), documentation (25%). GI balance excluded to avoid circularity.",
   "caveats": [
     "Quality proxies are commit-derived, not ground-truth quality assessments",
     "Composite score weights are heuristic, not empirically calibrated",
-    "Small N (segments) limits statistical power",
-    "Sprint date ranges may overlap slightly",
+    "Weekly bins vary in commit count (heteroskedasticity risk)",
+    "Bootstrap CI assumes exchangeability of weekly observations",
+    "Named segment date ranges may overlap slightly",
     "Layer 3 ensemble classifier used (keyword + diff-stat + file-type)"
   ]
 }
