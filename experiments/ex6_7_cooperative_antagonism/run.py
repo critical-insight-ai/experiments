@@ -339,7 +339,7 @@ def run_workflow(
         elapsed += poll_interval
 
         status_cmd = [
-            "cognos", "workflows", "runs", "get", run_id,
+            "cognos", "workflows", "runs", "status", run_id,
             "--server", server,
             "--token", token,
             "--tenant", tenant,

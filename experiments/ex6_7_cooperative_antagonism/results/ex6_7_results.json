@@ -1,27 +1,89 @@
 {
   "experiment": "EX-6.7",
-  "run": "20260403-231105",
-  "status": "completed",
-  "evidence_level": "observational",
-  "measurements": {
-    "run_id": "run/workflow/acme/ex-6-7-cooperative-antagonism/1.0.0/20260403005924-f2bd0edd",
-    "duration": "4 min 30 sec (00:59:24 - 01:03:55 UTC)",
-    "total_tokens": 18494,
-    "tasks_completed": 7,
-    "tasks_total": 7,
-    "tasks_failed": 0,
-    "tool_calls": 0,
-    "quality_trajectory": "[6.7, 7.9, 8.2]",
-    "breadth_trajectory": "[63, 96, 126]",
-    "mode_collapse": 0.0,
-    "overall_score": 8.2,
-    "dimension_scores": "{\"accuracy\": 9, \"completeness\": 8, \"coherence\": 8, \"depth\": 7, \"falsifiability\": 8, \"source diversity\": 9}",
-    "round_details": "[{\"round\": 1, \"accuracy\": 7, \"completeness\": 7, \"coherence\": 6, \"depth\": 6, \"falsifiability\": 7, \"source_diversity\": 7, \"breadth\": 63}, {\"round\": 2, \"accuracy\": 8, \"completeness\": 8, \"coherence\": 8, \"depth\": 7, \"falsifiability\": 8, \"source_diversity\": 8, \"breadth\": 96}, {\"round\": 3, \"accuracy\": 9, \"completeness\": 8, \"coherence\": 8, \"depth\": 7, \"falsifiability\": 8, \"source_diversity\": 9, \"breadth\": 126}]"
+  "hypothesis": "H-4",
+  "runs": [
+    {
+      "run_id": "run1-20260403",
+      "date": "2026-04-03",
+      "status": "completed",
+      "condition": "no-tools",
+      "topic": "semiconductor-geopolitics",
+      "model": "gpt-4.1-2025-04-14",
+      "tasks_completed": 7,
+      "tasks_total": 7,
+      "tool_calls_total": 0,
+      "tool_calls_successful": 0,
+      "tokens_total": 18494,
+      "quality_trajectory": [6.7, 7.9, 8.2],
+      "breadth_trajectory": [63, 96, 126],
+      "mode_collapse": false,
+      "notes": "Bundle defects prevented tool invocation. Agents operated from prompts only."
+    },
+    {
+      "run_id": "run2-20260404",
+      "run_id_full": "run/workflow/acme/ex-6-7-cooperative-antagonism/1.0.0/20260404102057-85a88290",
+      "date": "2026-04-04",
+      "status": "completed",
+      "condition": "tools-enabled-infrastructure-missing",
+      "topic": "semiconductor-geopolitics",
+      "model": "gpt-4.1-2025-04-14",
+      "tasks_completed": 7,
+      "tasks_total": 7,
+      "tool_calls_total": 27,
+      "tool_calls_successful": 0,
+      "tokens_total": 96197,
+      "task_breakdown": [
+        {"task": "generate-round-1", "tokens": 23050, "tool_calls": 6, "turns": 5},
+        {"task": "critique-round-1", "tokens": 8585, "tool_calls": 2, "turns": 2},
+        {"task": "generate-round-2", "tokens": 13963, "tool_calls": 6, "turns": 3},
+        {"task": "critique-round-2", "tokens": 17087, "tool_calls": 3, "turns": 4},
+        {"task": "generate-round-3", "tokens": 12115, "tool_calls": 2, "turns": 3},
+        {"task": "critique-round-3", "tokens": 8734, "tool_calls": 2, "turns": 2},
+        {"task": "judge-verdict", "tokens": 12663, "tool_calls": 6, "turns": 3}
+      ],
+      "tool_errors": {
+        "425_too_early": 16,
+        "403_forbidden": 8,
+        "405_method_not_allowed": 2,
+        "404_not_found": 1
+      },
+      "tools_attempted": [
+        "document.create_from_template",
+        "document.create",
+        "document.read",
+        "document.list",
+        "channels.search",
+        "task.list",
+        "web.search.qa",
+        "web.search.raw"
+      ],
+      "quality_trajectory": null,
+      "breadth_trajectory": null,
+      "mode_collapse": null,
+      "judge_verdict": "Unable to score — judge lacked structured-documents:read permission",
+      "notes": "Bundle fix enabled tool invocation (27 vs 0). All calls failed due to Docker infrastructure gaps. 4th bundle defect found: gi-judge missing structured-documents:read permission."
+    }
+  ],
+  "comparison": {
+    "tool_calls": {"run1": 0, "run2": 27, "delta": "+27"},
+    "tokens": {"run1": 18494, "run2": 96197, "ratio": "5.2x"},
+    "tasks_completed": {"run1": 7, "run2": 7},
+    "bundle_fix_validated": true,
+    "infrastructure_gap_identified": true,
+    "quality_comparison": "Deferred — Run 2 judge could not score due to permission defect"
   },
-  "interpretation": "Quality: 6.7 -> 7.9 -> 8.2. Tool calls: 0. Mode collapse: no. vs Run 1 baseline: quality delta +0.0, tool delta +0.",
-  "caveats": [
-    "Single run \u2014 no statistical power for cross-run comparison",
-    "Different model versions across runs may confound",
-    "Quality scores are model-self-assessed (judge agent), not ground truth"
+  "evidence_level": "observational",
+  "interpretation": "Bundle fix validated: agents attempt correct tools (27 calls vs 0). Run 3 needed with working infrastructure for quality comparison.",
+  "bundle_defects_found": [
+    "Run 1: wrong field name (tools vs defaultTools)",
+    "Run 1: wrong tool IDs (web.search vs web.search.qa)",
+    "Run 1: missing defaultPermissions block",
+    "Run 2: gi-judge missing structured-documents:read permission"
+  ],
+  "next_steps": [
+    "Fix gi-judge permissions in bundle",
+    "Configure web search MCP endpoint in Docker cluster",
+    "Resolve 425/403 tool infrastructure errors",
+    "Re-run as Run 3 with working tools for quality comparison"
   ]
 }

@@ -43,20 +43,71 @@ research, document creation, or channel communication.
 **Fix applied**: Bundle updated to use `defaultTools` with correct specific
 tool IDs and `defaultPermissions` block. Skills' `toolIds` also corrected.
 
-## Run 2 Plan (with tool invocation)
+## Run 2 Results (2026-04-04, tools enabled, infrastructure missing)
 
-- Same topic (semiconductor geopolitics) for controlled comparison
-- Success criteria: quality ≥ 8.0 final, **tool calls > 0**, no mode collapse
-- Key comparison: does tool access improve quality trajectory or breadth?
+**Bundle fix validated.** The corrected bundle enabled tool invocation:
+agents attempted 27 tool calls across 7 tasks (vs 0 in Run 1).
 
-### Run 2 Pre-Flight Checklist
+| Metric | Run 1 | Run 2 | Delta |
+|--------|-------|-------|-------|
+| Tool calls | 0 | 27 | +27 |
+| Tokens | 18,494 | 96,197 | 5.2x |
+| Tasks completed | 7/7 | 7/7 | — |
+| Quality trajectory | 6.7→7.9→8.2 | Not scored | Judge lacked permissions |
+| Mode collapse | None | Not assessed | — |
 
-- [ ] Bundle has `defaultTools` with `- toolId:` entries (auto-validated by runner)
-- [ ] Docker cluster running on port 8080
-- [ ] Keycloak token obtained for `acme` tenant
-- [ ] `web.search.qa` returns results (test: `cognos tools test web.search.qa ...`)
-- [ ] SemanticMemoryProfile applied with working vector store binding
-- [ ] Model supports function calling (gpt-4.1 confirmed)
+### Task-Level Breakdown (Run 2)
+
+| Task | Tokens | Tool Calls | Turns | Elapsed |
+|------|--------|------------|-------|---------|
+| generate-round-1 | 23,050 | 6 | 5 | 1:08 |
+| critique-round-1 | 8,585 | 2 | 2 | 0:36 |
+| generate-round-2 | 13,963 | 6 | 3 | 1:47 |
+| critique-round-2 | 17,087 | 3 | 4 | 0:52 |
+| generate-round-3 | 12,115 | 2 | 3 | 0:36 |
+| critique-round-3 | 8,734 | 2 | 2 | 0:37 |
+| judge-verdict | 12,663 | 6 | 3 | 1:40 |
+
+### Why All 27 Tool Calls Failed
+
+The agents tried the right tools but the Docker cluster infrastructure
+wasn't ready:
+
+| Error | Count | Cause |
+|-------|-------|-------|
+| 425 (Too Early) | 16 | Tools infrastructure not initialized |
+| 403 (Forbidden) | 8 | Permission denied at service level |
+| 405 (Method Not Allowed) | 2 | Web search MCP not configured |
+| 404 (Not Found) | 1 | Search endpoint missing |
+
+Tools attempted: `document.create_from_template`, `document.create`,
+`document.read`, `document.list`, `channels.search`, `task.list`,
+`web.search.qa`, `web.search.raw`
+
+### 4th Bundle Defect Found
+
+The `gi-judge` agent type lacks `structured-documents:read` permission.
+The judge couldn't read the experiment dossier or channel history,
+so it couldn't produce quality scores.
+
+### Key Findings
+
+1. **Bundle fix confirmed**: 27 tool calls (vs 0) proves the three Run 1
+   defects were correctly diagnosed and fixed
+2. **Graceful degradation**: All tasks completed despite 100% tool failure —
+   agents fell back to parametric generation
+3. **Token inflation**: Tool retry turns consume 5.2x more tokens
+4. **Agent role fidelity**: Generator used `document.create`, `web.search`;
+   Critic used `document.list`, `channels.search`; Judge used all three
+   categories — agents follow their playbook instructions
+
+### Run 3 Plan (with working infrastructure)
+
+- [ ] Fix gi-judge permissions (`structured-documents:read`)
+- [ ] Configure web search MCP endpoint in Docker
+- [ ] Resolve 425 tool initialization errors (possibly needs warm-up)
+- [ ] Re-run same topic for controlled comparison
+- [ ] Success criteria: tool calls > 0 **and** tool calls successful > 0
 
 ## Data Source
 
