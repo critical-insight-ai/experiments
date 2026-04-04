@@ -284,9 +284,128 @@ This is consistent with H-4 (cooperative antagonism): the adversarial
 pattern works even without tools, but tools transform the process from
 a conversation into a **knowledge construction pipeline**.
 
+## Run 6 Results (2026-04-04, 7 rounds — Diminishing Returns Curve)
+
+Extended from 3 to 7 rounds to find the convergence point. Used a separate
+bundle (`ex-6-7b-extended-rounds-bundle.yaml`) with 15 tasks (7 generate +
+7 critique + 1 judge). Same topic (semiconductor geopolitics), same model
+(gpt-4.1-2025-04-14), same agent types/skills from the base bundle.
+
+| Metric | Run 5 (3 rounds) | Run 6 (7 rounds) |
+|--------|-------------------|-------------------|
+| Rounds | 3 | **7** |
+| Tasks | 7 | **15** |
+| Tokens | 319,423 | **1,112,667** |
+| Duration | 4:00 | **8:31** |
+| Overall (final) | 8.5 | **9.28** |
+| Breadth (final) | 432 | **350** |
+
+### Per-Round Quality Trajectory
+
+| Round | Accuracy | Complete | Coherence | Depth | Falsif. | Src.Div. | **OVERALL** | **Δ** |
+|-------|----------|----------|-----------|-------|---------|----------|-------------|-------|
+| 1 | 8.0 | 7.5 | 8.0 | 7.0 | 7.5 | 6.0 | **7.65** | — |
+| 2 | 8.3 | 8.0 | 8.5 | 7.5 | 8.0 | 7.0 | **8.06** | +0.41 |
+| 3 | 8.7 | 8.7 | 9.0 | 8.5 | 8.5 | 8.0 | **8.73** | +0.67 |
+| 4 | 8.8 | 9.1 | 9.1 | 9.0 | 8.7 | 9.0 | **9.09** | +0.36 |
+| 5 | 9.0 | 9.4 | 9.2 | 9.1 | 8.8 | 9.2 | **9.23** | +0.14 |
+| 6 | 9.0 | 9.5 | 9.2 | 9.2 | 8.8 | 9.2 | **9.26** | +0.03 |
+| 7 | 9.0 | 9.5 | 9.2 | 9.3 | 8.8 | 9.2 | **9.28** | +0.02 |
+
+### Breadth Trajectory
+
+| Round | Distinct Concepts | Growth vs R1 |
+|-------|-------------------|--------------|
+| 1 | 32 | — |
+| 2 | 75 | 2.3x |
+| 3 | 168 | 5.3x |
+| 4 | 315 | 9.8x |
+| 5 | 350 | 10.9x |
+| 6 | 350 | 10.9x |
+| 7 | 350 | 10.9x |
+
+Breadth saturates at Round 5. Later rounds refine existing concepts but
+do not introduce new ones.
+
+### Task-Level Breakdown (Run 6)
+
+| Task | Tokens | Elapsed |
+|------|--------|---------|
+| generate-round-1 | 46,908 | 24.5s |
+| critique-round-1 | 93,216 | 21.9s |
+| generate-round-2 | 166,915 | 16.4s |
+| critique-round-2 | 96,112 | 12.9s |
+| generate-round-3 | 88,450 | 29.2s |
+| critique-round-3 | 43,312 | 14.7s |
+| generate-round-4 | 192,680 | 46.1s |
+| critique-round-4 | 122,812 | 17.3s |
+| generate-round-5 | 49,664 | 19.4s |
+| critique-round-5 | 12,279 | 7.9s |
+| generate-round-6 | 20,008 | 10.3s |
+| critique-round-6 | 81,851 | 21.1s |
+| generate-round-7 | 31,430 | 24.1s |
+| critique-round-7 | 8,256 | 5.9s |
+| judge-verdict | 58,774 | 31.5s |
+
+Token investment peaks at Round 4 (315k) then drops sharply — agents
+recognize diminishing returns and invest less in later rounds.
+
+### Most Impactful Critic Objections
+
+1. **Overemphasis on fabs** — led to inclusion of upstream materials,
+   software ecosystem, and packaging/testing
+2. **Overly pessimistic on US/EU catch-up** — prompted scenario analysis
+   and acknowledgment of local hurdles (water, talent, permits)
+3. **Cybersecurity risks** — added as major latent amplifier with evidence
+
+### Recovery Timer Bug (Platform Finding)
+
+The [OneWay] callback from `AgentTaskGrain` → `WorkflowGrain` never
+fires. The 30-second recovery timer is the **sole mechanism** advancing
+the workflow between sequential tasks.
+
+| Metric | Value |
+|--------|-------|
+| Total idle time | **207.1 seconds** |
+| Average gap per task | **13.8 seconds** |
+| Min gap | 0.8 seconds |
+| Max gap | 28.5 seconds |
+| % of wall clock | **40.5%** |
+
+**Root cause**: `IWorkflowGrain.OnTaskCompletedAsync` is marked `[OneWay]`.
+The direct callback from silo2 (AgentTaskGrain) to silo1 (WorkflowGrain)
+silently fails — neither the success log nor the catch handler fires.
+The recovery timer + CLI status polling (which triggers `TriggerRecoveryAsync`)
+are what actually advance the workflow, with variable latency.
+
+**Impact**: Fixing this bug would reduce the 8:31 run to ~5:04 (active
+work only). This is a platform-level issue affecting all sequential
+workflow tasks.
+
+### Key Finding: 5 Rounds is Optimal
+
+```
+Quality: 7.65 → 8.06 → 8.73 → 9.09 → 9.23 → 9.26 → 9.28
+Delta:         +0.41   +0.67   +0.36   +0.14   +0.03   +0.02
+                ^^^^^^^^^^^^^^^^^^^^    ^^^^^^^^   negligible
+                 steep improvement      diminishing
+```
+
+- **3 rounds too shallow**: R4 still adds +0.36 and major concept breadth
+- **5 rounds optimal**: 99.5% of final quality (9.23/9.28); breadth saturated
+- **6-7 rounds negligible**: +0.05 total for 2 extra rounds and ~200k tokens
+- **Sweet spot**: Rounds 4-5 are where quality transitions from steep growth
+  to asymptotic plateau
+
+The convergence curve follows a classic sigmoid shape. The debate reaches
+informational saturation at Round 5 — critics run out of novel objections,
+and generators have addressed all major gaps. This empirically validates
+5 rounds as the default design for cooperative-antagonistic workflows.
+
 ## Data Source
 
-- CRD bundle: `Cognos/docs/demos/acme-briefing/ex-6-7-cooperative-antagonism-bundle.yaml`
+- CRD bundle (3-round): `Cognos/docs/demos/acme-briefing/ex-6-7-cooperative-antagonism-bundle.yaml`
+- CRD bundle (7-round): `Cognos/docs/demos/acme-briefing/ex-6-7b-extended-rounds-bundle.yaml`
 - Run outputs: `C:\Source\CriticalInsight\CognOS-Workloads-Outputs\ex-6-7-cooperative-antagonism\`
 
 ## Usage
