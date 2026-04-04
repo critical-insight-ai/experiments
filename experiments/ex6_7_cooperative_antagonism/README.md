@@ -227,11 +227,62 @@ insight about CognOS:
 
 ### Run 5 Next Steps
 
-- [ ] Extract judge quality scores from Run 5 artifacts
-- [ ] Measure topic breadth (unique concepts per round)
-- [ ] Detect mode collapse (semantic diversity across outputs)
 - [ ] Run 6 with web search backend for full tool coverage
-- [ ] Compare Run 1 (no-tools) vs Run 5 (tools-working) quality trajectories
+- [ ] Compare quality across different topics (not just semiconductor geopolitics)
+- [ ] Measure token efficiency (quality per token)
+
+## Quality Trajectory Comparison: Run 1 (no tools) vs Run 5 (tools working)
+
+### Overall Quality Scores
+
+| Dimension | Run 1 (no tools) | Run 5 (tools) | Delta |
+|-----------|------------------|---------------|-------|
+| Accuracy | 9 | 8 | -1 |
+| Completeness | 8 | 9 | +1 |
+| Coherence | 8 | 9 | +1 |
+| Depth | 7 | 8 | +1 |
+| Falsifiability | 8 | 8 | 0 |
+| Source Diversity | 9 | 8 | -1 |
+| **Overall** | **8.2** | **8.5** | **+0.3** |
+
+### Convergence Trajectory
+
+| Run | Round 1 | Round 2 | Round 3 |
+|-----|---------|---------|---------|
+| Run 1 (no tools) | 6.7 | 7.9 | 8.2 |
+| Run 5 (tools) | 6-7 | 7-8.5 | 8-9 |
+
+### Breadth (Mode Collapse Detection)
+
+| Run | Round 1 | Round 3 | Growth |
+|-----|---------|---------|--------|
+| Run 1 | 63 | 126 | 2.0x |
+| Run 5 | 120 | 432 | 3.6x |
+
+Neither run showed mode collapse. Run 5's breadth grew 3.6x vs Run 1's
+2.0x — tools enable broader exploration (more themes, sources, perspectives).
+
+### Key Insight: Marginal Quality, Qualitative Shift
+
+The headline finding is surprising: **+0.3 quality points for 17.3x more tokens.**
+At the top of the quality scale, diminishing returns are expected. But the
+composition pattern is qualitatively different:
+
+- **Run 1**: Agents operated entirely from parametric knowledge. Quality
+  came from the adversarial debate structure itself.
+- **Run 5**: Agents created structured documents (dossiers), posted to
+  channels, managed sub-tasks, captured memory scenes, and read each
+  other's work products. The debate was mediated by **persistent artifacts**
+  rather than stateless message passing.
+
+The +0.3 quality delta understates the difference. Run 5 produces a
+**reusable evidence trail**: documents, channel history, task records,
+and memory snapshots that persist after the workflow completes. Run 1
+produces only the final text output.
+
+This is consistent with H-4 (cooperative antagonism): the adversarial
+pattern works even without tools, but tools transform the process from
+a conversation into a **knowledge construction pipeline**.
 
 ## Data Source
 

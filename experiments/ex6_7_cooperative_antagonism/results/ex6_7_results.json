@@ -16,7 +16,16 @@
       "tokens_total": 18494,
       "duration": "~3 min",
       "quality_trajectory": [6.7, 7.9, 8.2],
+      "quality_scores": {
+        "accuracy": 9, "completeness": 8, "coherence": 8, "depth": 7,
+        "falsifiability": 8, "source_diversity": 9, "overall": 8.2
+      },
       "breadth_trajectory": [63, 96, 126],
+      "breadth_components": {
+        "round1": {"themes": 3, "sources": 3, "perspectives": 7},
+        "round2": {"themes": 4, "sources": 4, "perspectives": 6},
+        "round3": {"themes": 6, "sources": 7, "perspectives": 3}
+      },
       "mode_collapse": false,
       "notes": "Bundle defects prevented tool invocation. Agents operated from prompts only."
     },
@@ -187,7 +196,23 @@
         "task_create": "9/15 failed — duplicate task creation attempts (agent retries on already-existing tasks)",
         "channels_post": "2/5 failed — transient channel write failures"
       },
-      "quality_trajectory": null,
+      "quality_trajectory": ["6-7", "7-8.5", "8-9"],
+      "quality_scores": {
+        "accuracy": 8, "completeness": 9, "coherence": 9, "depth": 8,
+        "falsifiability": 8, "source_diversity": 8, "overall": 8.5
+      },
+      "breadth_trajectory": [120, null, 432],
+      "breadth_components": {
+        "round1": {"themes": 5, "sources": 6, "perspectives": 4},
+        "round3": {"themes": 8, "sources": 9, "perspectives": 6}
+      },
+      "mode_collapse": false,
+      "most_impactful_objections": [
+        "China's indigenous innovation — forced longer-term vulnerability rethink",
+        "Third-country agency — Japan, Taiwan, India spurred alliance/supply chain expansion",
+        "Escalation risks — triggered deeper dual-use and conflict scenario treatment"
+      ],
+      "judge_verdict": "VALID AND EXEMPLAR ANALYSIS",
       "notes": "BREAKTHROUGH — first successful tool invocations in EX-6.7. Instance-level permissions on Agent CRDs bypass stale AgentTypeRegistry grain. 59/75 tools succeed (79%). All platform tools work; only web.search fails (no backend). Agents create documents, read channels, manage tasks, finalize dossiers, and capture memory scenes."
     }
   ],
@@ -200,7 +225,16 @@
     "bundle_fix_validated": true,
     "infrastructure_gap_identified": true,
     "permission_fix_validated": true,
-    "quality_comparison": "Deferred — Run 5 quality trajectory analysis needed (judge now has working tools)"
+    "quality_comparison": {
+      "run1_overall": 8.2,
+      "run5_overall": 8.5,
+      "delta": "+0.3",
+      "run1_strengths": "accuracy (9), source_diversity (9)",
+      "run5_strengths": "completeness (9), coherence (9)",
+      "run5_breadth_growth": "120 → 432 (3.6x vs Run 1's 63 → 126 = 2.0x)",
+      "both_no_mode_collapse": true,
+      "key_insight": "Quality scores similar (8.2 vs 8.5) but Run 5 shows broader convergence trajectory and richer mode collapse metrics. The 17.3x token increase produced only +0.3 quality points — diminishing returns at this quality level, but the composition pattern (documents, channels, tasks) is qualitatively different."
+    }
   },
   "evidence_level": "observational",
   "interpretation": "Five-run progression reveals layered infrastructure requirements for agentic tool use. Run 1→2: bundle schema fix (0→27 tool calls). Run 2→3: PriorityGuard fix (425 errors eliminated). Runs 3-4: stale Orleans grain permissions persist across silo restarts (PostgreSQL-backed state). Run 5: instance-level permissions on Agent CRDs bypass the stale grain registry entirely, yielding 59/75 successful tool calls (79%). Token consumption scales 17.3x from baseline when tools succeed — agents invest heavily in document creation, channel communication, and task management. The cooperative-antagonistic debate pattern emerges clearly in Run 5: generators create structured dossiers, critics query channels and documents to find weaknesses, and the judge synthesizes via document reads across all rounds.",
